@@ -582,6 +582,10 @@ section above:
 [root@localhost ~]# sed -i -e 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="default_hugepagesz=1G hugepagesz=1G hugepages=2 /'  /etc/default/grub
 [root@localhost ~]# grub2-mkconfig -o /boot/grub2/grub.cfg
 [root@localhost ~]# driverctl -v set-override 0000:00:02.0 uio_pci_generic
+[root@localhost ~]# systemctl enable tuned
+[root@localhost ~]# systemctl start tuned
+[root@localhost ~]# echo isolated_cores=1,2,3 >> /etc/tuned/cpu-partitioning-variables.conf
+[root@localhost ~]# tuned-adm profile cpu-partitioning
 [root@localhost ~]# reboot
 ```
 
