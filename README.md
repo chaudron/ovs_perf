@@ -9,7 +9,7 @@ details on what the PVP test does, please refer to the following blog post,
 
 
 This setup tutorial needs two machines with Red Hat Enterprise Linux, in this
-example we use version 7.3. One machine will be used as a traffic generator
+example, we use version 7.3. One machine will be used as a traffic generator
 using T-Rex, the other one will be the DUT running Open vSwitch. We use two
 Intel 82599ES 10G adapters to interconnect the machines.
 
@@ -22,6 +22,12 @@ Intel 82599ES 10G adapters to interconnect the machines.
 One of the two machines we will use for the T-Rex traffic generator. We will
 also use this machine to run the actual PVP script, so some additional setup
 steps are related to this.
+
+
+Please check out the [T-Rex Installation Manual](https://trex-tgn.cisco.com/trex/doc/trex_manual.html#_download_and_installation)
+for the minimal system requirements to run T-Rex. For example having a Haswell
+or newer CPU. Also, do not forget to enable VT-d in the BIOS
+
 
 
 ### Register Red Hat Enterprise Linux
@@ -57,11 +63,14 @@ yum -y install lshw emacs gcc git python-devel python-setuptools python-pip \
                tmux tuned-profiles-cpu-partitioning wget
 ```
 
-Rather than using the default 2M huge pages we configure 32 1G pages.
-You can adjust this to your systems specifications.
+
+### Tweak the kernel
+Rather than using the default 2M huge pages we configure 32 1G pages. You can
+adjust this to your system's specifications. In this step we also enable iommu
+needed by some of the DPDK PMD drivers used by T-Rex:
 
 ```
-sed -i -e 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="default_hugepagesz=1G hugepagesz=1G hugepages=32 /'  /etc/default/grub
+sed -i -e 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="default_hugepagesz=1G hugepagesz=1G hugepages=32 iommu=on intel_iommu=pt /'  /etc/default/grub
 grub2-mkconfig -o /boot/grub2/grub.cfg
 ```
 
@@ -90,8 +99,12 @@ pci@0000:07:00.0  em3        network        I350 Gigabit Network Connection
 pci@0000:07:00.1  em4        network        I350 Gigabit Network Connection
 ```
 
-In our case we will use em1, so PCI 0000:01:00.0. However as T-Rex likes
+In our case, we will use em1, so PCI 0000:01:00.0. However as T-Rex likes
 port pairs, we will also assign em2, 0000:01:00.1, to T-Rex.
+
+__NOTE__: Make sure your network card has a kernel driver loaded, i.e. has a
+_Device_ name in the output above, or else configuration in the step below
+might fail.
 
 
 Next step is to configure T-Rex:
@@ -159,8 +172,8 @@ to not dedicate all CPUs to T-Rex. Below you see what we changed in the
 
 
 ### Tweak the system for T-Rex usage
-We know which threads will be used by T-Rex, lets dedicate them to this task.
-We do this by applying the cpu-partitioning profile, and configure the isolated
+We know which threads will be used by T-Rex, let's dedicate them to this task.
+We do this by applying the cpu-partitioning profile and configure the isolated
 core mask:
 
 ```
@@ -170,7 +183,7 @@ echo isolated_cores=4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,
 tuned-adm profile cpu-partitioning
 ```
 
-Now it's time to reboot the machine to active the isolated cores, and use the
+Now it's time to reboot the machine to active the isolated cores and use the
 configured 1G huge pages:
 
 ```
@@ -183,7 +196,7 @@ Now we're ready to start the T-Rex server in a tmux session, so we can look at
 the console if we want to:
 
 ```
-cd ~/trex/v2.28
+cd ~/trex/v2.29
 tmux
 ./t-rex-64 -i
 ```
@@ -193,13 +206,13 @@ tmux
 
 ## Setup the T-Rex host to run the actual PVP script
 As our T-Rex machine has enough resources to also run the PVP script we decided
-to run it there. However in theory you can run the PVP script on a third
+to run it there. However, in theory, you can run the PVP script on a third
 machine or even the DUT. But make sure to keep the machine close to the
 traffic generator (either the T-Rex or Xena), as it needs to communicate with
 it to capture statistics.
 
 ### Install the PVP scripts
-First we need to install the script on the machine:
+First, we need to install the script on the machine:
 
 ```
 git clone https://github.com/chaudron/ovs_perf.git
@@ -211,7 +224,7 @@ We need to install a bunch of Python libraries we need for the PVP script.
 We will use pip to do this:
 
 ```
-pip install enum34 natsort netaddr matplotlib scapy spur
+pip install --upgrade enum34 natsort netaddr matplotlib scapy spur
 ```
 
 
@@ -241,8 +254,8 @@ cp -r trex_client/external_libs/ ~/pvp_test/trex_stl_lib/
 ## Setup the Device Under Test (DUT), Open vSwitch
 <a name="DUTsetup"/>
 
-For this tutorial we use Open vSwitch in combination with the DPDK,
-userspace datapath. At the end of this document we also explain how to
+For this tutorial, we use Open vSwitch in combination with the DPDK,
+userspace datapath. At the end of this document, we also explain how to
 redo the configuration to use the Linux kernel datapath.
 
 
@@ -298,7 +311,7 @@ yum -y install aspell aspell-en autoconf automake bc checkpolicy \
 
 ### Tweak the system for OVS-DPDK and Qemu usage
 There is work in progress for Open vSwitch DPDK to play nicely with SELinux,
-but for now the easiest way is to disable it:
+but for now, the easiest way is to disable it:
 
 ```
 sed -i -e 's/SELINUX=enforcing/SELINUX=permissive/' /etc/selinux/config
@@ -307,7 +320,7 @@ setenforce permissive
 
 
 Rather than using the default 2M huge pages we configure 32 1G pages. You can
-adjust this to your systems specifications. In this step we also enable iommu
+adjust this to your system's specifications. In this step we also enable iommu
 needed by the DPDK PMD driver:
 
 ```
@@ -316,10 +329,20 @@ grub2-mkconfig -o /boot/grub2/grub.cfg
 ```
 
 
-Our system is using Hyper-Threading and we would like to use the first
-Hyper-Threading pair for system usage. The remaining threads we would like
-dedicate to Qemu and Open vSwitch. To figure out the numbers of threads, and
-the first thread pair we execute the following:
+Our system is a single NUMA node using Hyper-Threading and we would like to
+use the first Hyper-Threading pair for system usage. The remaining threads
+we would like dedicate to Qemu and Open vSwitch.
+
+
+__NOTE__ that if you have a multi-NUMA system the cores you assign to both Open
+vSwitch and Qemu need to be one same NUMA node as the network card. For some
+more background information on this see the [OVS-DPDK Parameters: Dealing with
+multi-NUMA](https://developers.redhat.com/blog/2017/06/28/ovs-dpdk-parameters-dealing-with-multi-numa/)
+blog post.
+
+
+To figure out the numbers of threads, and the first thread pair we execute
+the following:
 
 ```
 # lscpu |grep -E "^CPU\(s\)|On-line|Thread\(s\) per core"
@@ -381,9 +404,9 @@ pci@0000:07:00.1  em4         network        I350 Gigabit Network Connection
 ```
 
 
-For our performance test we would like to use the 10GbE interface _em1_. You
-could use the _dpdk-devbind_ utility to bind the interface to DPDK, however this
-configuration will not survive a reboot. The preferred solution is to use
+For our performance test, we would like to use the 10GbE interface _em1_. You
+could use the _dpdk-devbind_ utility to bind the interface to DPDK, however,
+this configuration will not survive a reboot. The preferred solution is to use
 _driverctl_:
 
 ```
@@ -392,7 +415,7 @@ driverctl: setting driver override for 0000:01:00.0: vfio-pci
 driverctl: loading driver vfio-pci
 driverctl: unbinding previous driver ixgbe
 driverctl: reprobing driver for 0000:01:00.0
-driverctl: failed to bind device 0000:01:00.0 to driver vfio-pci
+driverctl: saving driver override for 0000:01:00.0
 
 # lshw -c network -businfo
 Bus info          Device      Class          Description
@@ -414,7 +437,7 @@ systemctl start openvswitch
 
 
 For OVS-DPDK we would like to use the second Hyper Thread pair (CPU 1,15) for
-the PMD threads. And the third Hyper Thread pair (CPU 2,16) for the non PMD
+the PMD threads. And the third Hyper Thread pair (CPU 2,16) for the none PMD
 DPDK threads. To configure this we execute the following commands:
 
 ```
@@ -426,7 +449,7 @@ systemctl restart openvswitch
 ```
 
 For the Physical to Virtual back to Physical(PVP) test we only need one bridge
-with two ports. In addition we will configure our interfaces with 2 receive
+with two ports. In addition, we will configure our interfaces with 2 receive
 queues:
 
 ```
@@ -452,7 +475,7 @@ ovs-vsctl add-port ovs_pvp_br0 vhost0 -- \
 
 ### Create the loopback Virtual Machine
 
-Get the [Red Hat Enterprise Linux 7.4 KVM](https://access.redhat.com/downloads/content/69/ver=/rhel---7/7.4/x86_64/product-software).
+Get the [Red Hat Enterprise Linux 7.4 KVM Guest Image](https://access.redhat.com/downloads/content/69/ver=/rhel---7/7.4/x86_64/product-software).
 If you do not have access to the image please contact your Red Had
 representative. Copy the image for use by qemu:
 
@@ -493,10 +516,14 @@ Setup as much as possible with a single call to _virt-install_:
   --os-variant=rhel7
 ```
 
+If you have a multi-NUMA system and you are not on NUMA node 0, you need to
+change the _nodeset_ values above accordingly.
+
+
 Note that we have been using cores 1,2,15,16 for OVS, and above we have assigned
 cores 3-6 to the loopback Virtual Machine (VM). For optimal performance we need
-to pin the vCPUs to real CPUs. In addition will also assign an additional core
-for Qemu related task to make sure they will not interrupt any PMD threads
+to pin the vCPUs to real CPUs. In addition, we will also assign an additional
+core for Qemu related task to make sure they will not interrupt any PMD threads
 running in the VM:
 
 ```
@@ -579,9 +606,11 @@ section above:
 [root@localhost ~]# yum -y clean all
 [root@localhost ~]# yum -y update
 [root@localhost ~]# yum -y install driverctl gcc kernel-devel numactl-devel tuned-profiles-cpu-partitioning wget
+[root@localhost ~]# yum -y update kernel
 [root@localhost ~]# sed -i -e 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="default_hugepagesz=1G hugepagesz=1G hugepages=2 /'  /etc/default/grub
 [root@localhost ~]# grub2-mkconfig -o /boot/grub2/grub.cfg
-[root@localhost ~]# driverctl -v set-override 0000:00:02.0 uio_pci_generic
+[root@localhost ~]# echo "options vfio enable_unsafe_noiommu_mode=1" > /etc/modprobe.d/vfio.conf
+[root@localhost ~]# driverctl -v set-override 0000:00:02.0 vfio-pci
 [root@localhost ~]# systemctl enable tuned
 [root@localhost ~]# systemctl start tuned
 [root@localhost ~]# echo isolated_cores=1,2,3 >> /etc/tuned/cpu-partitioning-variables.conf
@@ -598,7 +627,7 @@ from source:
 [root@localhost ~]# wget http://fast.dpdk.org/rel/dpdk-17.08.tar.xz
 [root@localhost ~]# tar xf dpdk-17.08.tar.xz
 [root@localhost ~]# cd dpdk-17.08
-[root@localhost dpdk-17.08]# make install T=x86_64-native-linuxapp-gcc
+[root@localhost dpdk-17.08]# make install T=x86_64-native-linuxapp-gcc DESTDIR=_install
 [root@localhost dpdk-17.08]# ln -s /root/dpdk-17.08/x86_64-native-linuxapp-gcc/app/testpmd /usr/bin/testpmd
 ```
 
@@ -696,7 +725,7 @@ executing the PVP script.
 Now we are all set to run the PVP script. We move back to the T-Rex host as we
 use this to execute the script.
 
-Before we start we need to set the back-end to not use a GUI, and create
+Before we start we need to set the back-end to not use a GUI and create
 a directory to store the results:
 
 ```
@@ -708,7 +737,7 @@ cd ~/pvp_results/
 
 
 Now we can do a quick 64 bytes packet run with 1000 flows. For details on the
-supported PVP script options see the [ovs_performance.py Supported Options](#options) chapter:
+supported PVP script options, see the [ovs_performance.py Supported Options](#options) chapter:
 
 ```
 # ~/pvp_test/ovs_performance.py \
@@ -862,7 +891,7 @@ create the graphs:
 ## ovs_performance.py Supported Options
 <a name="options"/>
 
-The __ovs\_performance.py__ script options are straight forward, and the help is displayed below.
+The __ovs\_performance.py__ script options are straightforward, and the help is displayed below.
 
 ```
 # ./ovs_performance.py --help
@@ -954,7 +983,7 @@ _--skip-pv-test_ option.
 test and
 makes sure the data path flows exists before starting the actual throughput test.
 * Flow type L4-UDP is not supported with T-Rex yet.
-* The Physical to Physical setup is supported, but has only been tested with
+* The Physical to Physical setup is supported but has only been tested with
 Xena traffic generator.
 
 
@@ -963,7 +992,7 @@ Xena traffic generator.
 
 ## Building Open vSwitch with DPDK from scratch
 
-Building Open vSwitch from scratch and use it for testing should be rather straight forward. The below example assumes you have Open vSwitch running as explained above.
+Building Open vSwitch from scratch and use it for testing should be rather straightforward. The below example assumes you have Open vSwitch running as explained above.
 
 First download the specific DPDK version we would like to use, and build it:
 
@@ -1177,7 +1206,7 @@ tar -cvzf pvp_results.tgz \
 
 ## Open vSwitch with Linux Kernel Datapath
 
-With the above setup we ran the PVP tests with the Open vSwitch DPDK datapath.
+With the above setup, we ran the PVP tests with the Open vSwitch DPDK datapath.
 This section assumes you have the previous configuration running, and explains
 the steps to convert it to a Linux datapath setup.
 
@@ -1208,7 +1237,7 @@ pci@0000:07:00.1  em4        network        I350 Gigabit Network Connection
 
 ## Recreate the OVS bridge
 
-In the previous step we deleted the OVS DPDK bridge, which now needs to be
+In the previous step, we deleted the OVS DPDK bridge, which now needs to be
 recreated for the kernel datapath. Recreate the bridge as follows:
 
 ```
@@ -1223,7 +1252,7 @@ automatically by Qemu when the VM is started.
 
 ## Creating a VM for use with the Open vSwitch bridge
 
-First we need to stop the existing VM, and clone it:
+First, we need to stop the existing VM, and clone it:
 
 ```
 virsh shutdown rhel_loopback
@@ -1234,7 +1263,7 @@ virt-clone --connect=qemu:///system \
 ```
 
 
-Now we need to change the _vhostuser_ type network interface to an openvswitch
+Now we need to change the _vhostuser_ type network interface to an Open vSwitch
 bridge. We need to edit the VM configuration manually, using the _virsh edit_
 command:
 
@@ -1348,4 +1377,6 @@ The PVP script should now work as before with some slide changes to the interfac
 ```
 
 
-__NOTE__: This section does not go over any additional tuning that can be done for the kernel datapath. However this example can be used as a base for performing PVP performance tests using hardware offload capable NICs.
+__NOTE__: This section does not go over any additional tuning that can be done
+for the kernel datapath. However this example, can be used as a base for
+performing PVP performance tests using hardware offload capable NICs.
