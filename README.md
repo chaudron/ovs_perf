@@ -70,7 +70,7 @@ adjust this to your system's specifications. In this step we also enable iommu
 needed by some of the DPDK PMD drivers used by T-Rex:
 
 ```
-sed -i -e 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="default_hugepagesz=1G hugepagesz=1G hugepages=32 iommu=on intel_iommu=pt /'  /etc/default/grub
+sed -i -e 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="default_hugepagesz=1G hugepagesz=1G hugepages=32 iommu=pt intel_iommu=on /'  /etc/default/grub
 grub2-mkconfig -o /boot/grub2/grub.cfg
 ```
 
