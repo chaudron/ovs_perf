@@ -204,7 +204,7 @@ echo
 echo "================================================================================="
 
 DATAPATH=dpdk
-FILENAME=~/pvp_results_`date +%Y-%m-%d_%H%M%S`.tgz
+FILENAME=~/pvp_results_`date +%Y-%m-%d_%H%M%S`_${DATAPATH}.tgz
 tar -czf ${FILENAME} ~/pvp_results_*_${DATAPATH} && rm -rf ~/pvp_results_*_${DATAPATH}
 
 echo "All test results are saved in: \"${FILENAME}\""
