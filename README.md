@@ -1,31 +1,37 @@
 # Automated Open vSwitch PVP testing
 
-The goal for this PVP script was to have a quick (and dirty) way to verify
-the performance (change) of an Open vSwitch (DPDK) setup. This script either
-works with a [Xena Networks traffic generator](http://xenanetworks.com/), or
-the [T-Rex Realistic Traffic Generator](https://trex-tgn.cisco.com). For
-details on what the PVP test does, please refer to the following blog post,
-[Measuring and comparing Open vSwitch performance](https://developers.redhat.com/blog/2017/06/05/measuring-and-comparing-open-vswitch-performance/)
+The goal for this PVP script is to have a quick (and dirty) way to verify
+the performance (change) of an Open vSwitch (DPDK) setup using the Physical to
+Virtual back to Physical topology. This configuration is also known as the PVP
+setup. The traffic will flow from a physical port to a virtual port on the
+Virtual Machine(VM), and then back to the physical port. This script uses the
+[TRex Realistic Traffic Generator](https://trex-tgn.cisco.com) for generating
+and verifying the traffic.
+
+
+For more details on the PVP test, take a look at the following blog post,
+[Measuring and comparing Open vSwitch performance](https://developers.redhat.com/blog/2017/06/05/measuring-and-comparing-open-vswitch-performance/).
 
 
 This setup tutorial needs two machines with Red Hat Enterprise Linux, in this
 example, we use version 7.3. One machine will be used as a traffic generator
-using T-Rex, the other one will be the DUT running Open vSwitch. We use two
-Intel 82599ES 10G adapters to interconnect the machines.
+using TRex, the other one will be the DUT running Open vSwitch. We use two
+Intel 82599ES 10G adapters to interconnect the machines. The script will take
+care of performing the tests with different packet sizes, and set of different
+traffic flows.
 
 
 
 
+## Setup the TRex traffic generator
 
-## Setup the T-Rex traffic generator
-
-One of the two machines we will use for the T-Rex traffic generator. We will
+One of the two machines we will use for the TRex traffic generator. We will
 also use this machine to run the actual PVP script, so some additional setup
 steps are related to this.
 
 
-Please check out the [T-Rex Installation Manual](https://trex-tgn.cisco.com/trex/doc/trex_manual.html#_download_and_installation)
-for the minimal system requirements to run T-Rex. For example having a Haswell
+Please check out the [TRex Installation Manual](https://trex-tgn.cisco.com/trex/doc/trex_manual.html#_download_and_installation)
+for the minimal system requirements to run TRex. For example having a Haswell
 or newer CPU. Also, do not forget to enable VT-d in the BIOS
 
 
@@ -67,16 +73,16 @@ yum -y install lshw emacs gcc git python-devel python-setuptools python-pip \
 ### Tweak the kernel
 Rather than using the default 2M huge pages we configure 32 1G pages. You can
 adjust this to your system's specifications. In this step we also enable iommu
-needed by some of the DPDK PMD drivers used by T-Rex:
+needed by some of the DPDK PMD drivers used by TRex:
 
 ```
-sed -i -e 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="default_hugepagesz=1G hugepagesz=1G hugepages=32 iommu=pt intel_iommu=on /'  /etc/default/grub
+sed -i -e 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="default_hugepagesz=1G hugepagesz=1G hugepages=32 iommu=on intel_iommu=pt /'  /etc/default/grub
 grub2-mkconfig -o /boot/grub2/grub.cfg
 ```
 
 
-### Download and installation of T-Rex
-Download and unpack the T-Rex traffic generator:
+### Download and installation of TRex
+Download and unpack the TRex traffic generator:
 
 ```
 mkdir trex
@@ -99,15 +105,15 @@ pci@0000:07:00.0  em3        network        I350 Gigabit Network Connection
 pci@0000:07:00.1  em4        network        I350 Gigabit Network Connection
 ```
 
-In our case, we will use em1, so PCI 0000:01:00.0. However as T-Rex likes
-port pairs, we will also assign em2, 0000:01:00.1, to T-Rex.
+In our case, we will use em1, so PCI 0000:01:00.0. However as TRex likes
+port pairs, we will also assign em2, 0000:01:00.1, to TRex.
 
 __NOTE__: Make sure your network card has a kernel driver loaded, i.e. has a
 _Device_ name in the output above, or else configuration in the step below
 might fail.
 
 
-Next step is to configure T-Rex:
+Next step is to configure TRex:
 
 ```
 # cd ~/trex/v2.29
@@ -160,7 +166,7 @@ Saved to /etc/trex_cfg.yaml.
 ```
 
 As we would like to run the performance script on this machine, we decided
-to not dedicate all CPUs to T-Rex. Below you see what we changed in the
+to not dedicate all CPUs to TRex. Below you see what we changed in the
 /etc/trex_cfg.yaml file to exclude threads 1-3:
 
 ```
@@ -171,8 +177,8 @@ to not dedicate all CPUs to T-Rex. Below you see what we changed in the
 ```
 
 
-### Tweak the system for T-Rex usage
-We know which threads will be used by T-Rex, let's dedicate them to this task.
+### Tweak the system for TRex usage
+We know which threads will be used by TRex, let's dedicate them to this task.
 We do this by applying the cpu-partitioning profile and configure the isolated
 core mask:
 
@@ -191,8 +197,8 @@ configured 1G huge pages:
 ```
 
 
-### Start the T-Rex server
-Now we're ready to start the T-Rex server in a tmux session, so we can look at
+### Start the TRex server
+Now we're ready to start the TRex server in a tmux session, so we can look at
 the console if we want to:
 
 ```
@@ -204,12 +210,11 @@ tmux
 
 
 
-## Setup the T-Rex host to run the actual PVP script
-As our T-Rex machine has enough resources to also run the PVP script we decided
+## Setup the TRex host to run the actual PVP script
+As our TRex machine has enough resources to also run the PVP script we decided
 to run it there. However, in theory, you can run the PVP script on a third
 machine or even the DUT. But make sure to keep the machine close to the
-traffic generator (either the T-Rex or Xena), as it needs to communicate with
-it to capture statistics.
+traffic generator, as it needs to communicate with it to capture statistics.
 
 ### Install the PVP scripts
 First, we need to install the script on the machine:
@@ -238,13 +243,13 @@ python setup.py install
 ```
 
 
-Finally we need to install the T-Rex stateless libraries:
+Finally we need to install the TRex stateless libraries:
 
 ```
 cd ~/trex/v2.29
 tar -xzf trex_client_v2.29.tar.gz
-cp -r trex_client/stl/trex_stl_lib/ ~/pvp_test
-cp -r trex_client/external_libs/ ~/pvp_test/trex_stl_lib/
+cp -r trex_client/stl/trex_stl_lib/ ~/ovs_perf
+cp -r trex_client/external_libs/ ~/ovs_perf/trex_stl_lib/
 
 ```
 
@@ -260,7 +265,7 @@ redo the configuration to use the Linux kernel datapath.
 
 
 ### Register Red Hat Enterprise Linux
-As with the T-Rex system we first need to register the system:
+As with the TRex system we first need to register the system:
 
 ```
 # subscription-manager register
@@ -722,7 +727,7 @@ executing the PVP script.
 
 ## Running the PVP script
 
-Now we are all set to run the PVP script. We move back to the T-Rex host as we
+Now we are all set to run the PVP script. We move back to the TRex host as we
 use this to execute the script.
 
 Before we start we need to set the back-end to not use a GUI and create
@@ -740,11 +745,11 @@ Now we can do a quick 64 bytes packet run with 1000 flows. For details on the
 supported PVP script options, see the [ovs_performance.py Supported Options](#options) chapter:
 
 ```
-# ~/pvp_test/ovs_performance.py \
+# ~/ovs_perf/ovs_performance.py \
   -d -l testrun_log.txt \              # Enable script debugging, and save the output to testrun_log.txt
-  --tester-type trex \                 # Set tester type to T-Rex
-  --tester-address localhost \         # IP address of the T-Rex server
-  --tester-interface 0 \               # Interface number used on the T-Rex
+  --tester-type trex \                 # Set tester type to TRex
+  --tester-address localhost \         # IP address of the TRex server
+  --tester-interface 0 \               # Interface number used on the TRex
   --ovs-address 10.19.17.133 \         # DUT IP address
   --ovs-user root \                    # DUT login user name
   --ovs-password root \                # DUT login user password
@@ -752,7 +757,7 @@ supported PVP script options, see the [ovs_performance.py Supported Options](#op
   --dut-vm-user root \                 # VM login user name
   --dut-vm-password root \             # VM login user password
   --dut-vm-nic-queues=2 \              # Number of rx/tx queues to use on the VM
-  --physical-interface dpdk0 \         # OVS Physical interface, i.e. connected to T-Rex
+  --physical-interface dpdk0 \         # OVS Physical interface, i.e. connected to TRex
   --physical-speed=10 \                # Speed of the physical interface, for DPDK we can not detect it reliably
   --virtual-interface vhost0 \         # OVS Virtual interface, i.e. connected to the VM
   --dut-vm-nic-pci=0000:00:02.0 \      # PCI address of the interface in the VM
@@ -804,7 +809,7 @@ Depending on the hardware configuration this will take around an hour:
 rm -rf ~/pvp_results
 mkdir ~/pvp_results
 cd ~/pvp_results/
-~/pvp_test/ovs_performance.py \
+~/ovs_perf/ovs_performance.py \
   -d -l testrun_log.txt \
   --tester-type trex \
   --tester-address localhost \
@@ -982,7 +987,7 @@ _--skip-pv-test_ option.
 * The _--warm-up_ option will send out traffic before each iteration of a
 test and
 makes sure the data path flows exists before starting the actual throughput test.
-* Flow type L4-UDP is not supported with T-Rex yet.
+* Flow type L4-UDP is not supported with TRex yet.
 * The Physical to Physical setup is supported but has only been tested with
 Xena traffic generator.
 
@@ -1071,7 +1076,8 @@ To verify the setup is still working, rerun the quick 64 bytes packet run with 1
 ## Full day PVP test
 
 This is a simple sequence of tests you could run which will take almost a full
-day to see how the system behaves over time.
+day to see how the system behaves over time. Note that you need to do this test
+twice, i.e. for both the Linux kernel and DPDK datapath.
 
 The basic full test as explained above runs for about an hour. So to make it
 run for about 10 hours, we need to increase the run time for each individual
@@ -1095,7 +1101,7 @@ Full test for ~10 hours using the L2 traffic profile:
 ```
 mkdir ~/pvp_results_10_l2
 cd ~/pvp_results_10_l2
-~/pvp_test/ovs_performance.py \
+~/ovs_perf/ovs_performance.py \
   -d -l testrun_log.txt \
   --tester-type trex \
   --tester-address localhost \
@@ -1121,7 +1127,7 @@ Full test for ~10 hours using the L3 traffic profile:
 ```
 mkdir ~/pvp_results_10_l3
 cd ~/pvp_results_10_l3
-~/pvp_test/ovs_performance.py \
+~/ovs_perf/ovs_performance.py \
   -d -l testrun_log.txt \
   --tester-type trex \
   --tester-address localhost \
@@ -1147,7 +1153,7 @@ Full test with default setting using the L2 traffic profile:
 ```
 mkdir ~/pvp_results_1_l2
 cd ~/pvp_results_1_l2
-~/pvp_test/ovs_performance.py \
+~/ovs_perf/ovs_performance.py \
   -d -l testrun_log.txt \
   --tester-type trex \
   --tester-address localhost \
@@ -1172,7 +1178,7 @@ Full test with default setting using the L3 traffic profile:
 ```
 mkdir ~/pvp_results_1_l3
 cd ~/pvp_results_1_l3
-~/pvp_test/ovs_performance.py \
+~/ovs_perf/ovs_performance.py \
   -d -l testrun_log.txt \
   --tester-type trex \
   --tester-address localhost \
@@ -1199,6 +1205,40 @@ It would be good to save your results for later comparison to new runs:
 tar -cvzf pvp_results.tgz \
   ~/pvp_results_10_l2 ~/pvp_results_10_l3 \
   ~/pvp_results_1_l2 ~/pvp_results_1_l3
+```
+
+To make thinks easy a shell script called __runfullday.sh__ is included.
+Make sure your system is setup correctly before you execute the script.
+
+```
+$./runfullday.sh
+This script will run the tests as explained in the "Full day PVP test"
+section. It will start the scripts according to the configuration given below,
+and will archive the results.
+
+NOTE: Make sure you are passing the basic test as explained in "Running the
+      PVP script" before starting the full day run!
+
+What datapath are you using, DPDK or Linux Kernel [dpdk/kernel]? dpdk
+What is the IP address where the DUT (Open vSwitch) is running? 10.19.17.133
+What is the IP address of the virtual machine running on the DUT? 192.168.122.186
+What is the IP address of the TRex tester? localhost
+What is the physical interface being used, i.e. dpdk0, em1, p4p5? dpdk0
+What is the virtual interface being used, i.e. vhost0, vnet0? vhost0
+What is the TRex tester physical interface being used? 0
+- Connecting to the tester...
+- Connecting to DUT, "10.19.17.1
+...
+...
+=================================================================================
+== ALL TESTS ARE DONE                                                         ===
+=================================================================================
+
+ Please verify all the results and make sure they are within the expected
+ rates for the blade!!
+
+=================================================================================
+All tests are done, results are saved in: "/root/pvp_results_2017-10-12_055506.tgz"
 ```
 
 
@@ -1324,7 +1364,7 @@ The PVP script should now work as before with some slide changes to the interfac
 
 ```
 # cd ~/pvp_results
-# ~/pvp_test/ovs_performance.py \
+# ~/ovs_perf/ovs_performance.py \
   -d -l testrun_log.txt \
   --tester-type trex \
   --tester-address localhost \
