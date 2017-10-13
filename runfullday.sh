@@ -173,7 +173,7 @@ echo
 # Check that all test have packets passing...
 #
 if grep -h -E "^10,|^1000,|^10000,|^100000,|^1000000," \
-    pvp_results_1*_l*_dpdk/test_results_l*.csv | \
+    ~/pvp_results_1*_l*_dpdk/test_results_l*.csv | \
     tr -s '\n\r' ',' | grep -q ",0,"; then
   echo "!! ERROR: Failed test, found a test with 0 packet troughput!!"
 fi
@@ -182,7 +182,7 @@ fi
 # Check the 256 byte, 10 Flow test, and make sure they have at least 75%
 # of 10G line rate at L3 [3396739,1325pps]
 #
-if grep -h "^10," pvp_results_1*_l3_dpdk/test_results_l3.csv | \
+if grep -h "^10," ~/pvp_results_1*_l3_dpdk/test_results_l3.csv | \
 	cut -d ',' -f 4 | \
 	awk '$1<3396739 {system("echo 1")} $1>=3396739{system("echo 2")}' | \
 	grep -q 1; then
@@ -203,7 +203,6 @@ echo
 #
 echo "================================================================================="
 
-DATAPATH=dpdk
 FILENAME=~/pvp_results_`date +%Y-%m-%d_%H%M%S`_${DATAPATH}.tgz
 tar -czf ${FILENAME} ~/pvp_results_*_${DATAPATH} && rm -rf ~/pvp_results_*_${DATAPATH}
 
