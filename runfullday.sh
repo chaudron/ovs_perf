@@ -48,6 +48,9 @@ done
 echo -n "What is the IP address where the DUT (Open vSwitch) is running? "
 read DUT_IP
 
+echo -n "What is the root password of the DUT? "
+read DUT_PW
+
 echo -n "What is the IP address of the virtual machine running on the DUT? "
 read VM_IP
 
@@ -76,7 +79,7 @@ cd ~/pvp_results_10_l2_$DATAPATH
   --tester-interface $TREX_INT \
   --ovs-address $DUT_IP \
   --ovs-user root \
-  --ovs-password root \
+  --ovs-password $DUT_PW \
   --dut-vm-address $VM_IP \
   --dut-vm-user root \
   --dut-vm-password root \
@@ -100,7 +103,7 @@ cd ~/pvp_results_10_l3_$DATAPATH
   --tester-interface $TREX_INT \
   --ovs-address $DUT_IP \
   --ovs-user root \
-  --ovs-password root \
+  --ovs-password $DUT_PW \
   --dut-vm-address $VM_IP \
   --dut-vm-user root \
   --dut-vm-password root \
@@ -124,7 +127,7 @@ cd ~/pvp_results_1_l2_$DATAPATH
   --tester-interface $TREX_INT \
   --ovs-address $DUT_IP \
   --ovs-user root \
-  --ovs-password root \
+  --ovs-password $DUT_PW \
   --dut-vm-address $VM_IP \
   --dut-vm-user root \
   --dut-vm-password root \
@@ -147,7 +150,7 @@ cd ~/pvp_results_1_l3_$DATAPATH
   --tester-interface $TREX_INT \
   --ovs-address $DUT_IP \
   --ovs-user root \
-  --ovs-password root \
+  --ovs-password $DUT_PW \
   --dut-vm-address $VM_IP \
   --dut-vm-user root \
   --dut-vm-password root \

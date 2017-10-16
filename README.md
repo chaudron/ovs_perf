@@ -1221,6 +1221,7 @@ NOTE: Make sure you are passing the basic test as explained in "Running the
 
 What datapath are you using, DPDK or Linux Kernel [dpdk/kernel]? dpdk
 What is the IP address where the DUT (Open vSwitch) is running? 10.19.17.133
+What is the root password of the DUT? root
 What is the IP address of the virtual machine running on the DUT? 192.168.122.186
 What is the IP address of the TRex tester? localhost
 What is the physical interface being used, i.e. dpdk0, em1, p4p5? dpdk0
