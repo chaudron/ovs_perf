@@ -45,6 +45,12 @@ while [[ ! ${DATAPATH} =~ ^dpdk|kernel$ ]]; do
     read DATAPATH
 done
 
+if [[ ${DATAPATH} = "kernel" ]]; then
+  NIC_Q=1    
+else
+  NIC_Q=2
+fi
+
 echo -n "What is the IP address where the DUT (Open vSwitch) is running? "
 read DUT_IP
 
@@ -83,7 +89,7 @@ cd ~/pvp_results_10_l2_$DATAPATH
   --dut-vm-address $VM_IP \
   --dut-vm-user root \
   --dut-vm-password root \
-  --dut-vm-nic-queues=2 \
+  --dut-vm-nic-queues=$NIC_Q \
   --physical-interface $PHY_INT \
   --physical-speed=10 \
   --virtual-interface $VM_INT \
@@ -107,7 +113,7 @@ cd ~/pvp_results_10_l3_$DATAPATH
   --dut-vm-address $VM_IP \
   --dut-vm-user root \
   --dut-vm-password root \
-  --dut-vm-nic-queues=2 \
+  --dut-vm-nic-queues=$NIC_Q \
   --physical-interface $PHY_INT \
   --physical-speed=10 \
   --virtual-interface $VM_INT \
@@ -131,7 +137,7 @@ cd ~/pvp_results_1_l2_$DATAPATH
   --dut-vm-address $VM_IP \
   --dut-vm-user root \
   --dut-vm-password root \
-  --dut-vm-nic-queues=2 \
+  --dut-vm-nic-queues=$NIC_Q \
   --physical-interface $PHY_INT \
   --physical-speed=10 \
   --virtual-interface $VM_INT \
@@ -154,7 +160,7 @@ cd ~/pvp_results_1_l3_$DATAPATH
   --dut-vm-address $VM_IP \
   --dut-vm-user root \
   --dut-vm-password root \
-  --dut-vm-nic-queues=2 \
+  --dut-vm-nic-queues=$NIC_Q \
   --physical-interface $PHY_INT \
   --physical-speed=10 \
   --virtual-interface $VM_INT \
@@ -176,7 +182,7 @@ echo
 # Check that all test have packets passing...
 #
 if grep -h -E "^10,|^1000,|^10000,|^100000,|^1000000," \
-    ~/pvp_results_1*_l*_dpdk/test_results_l*.csv | \
+    ~/pvp_results_1*_l*_*/test_results_l*.csv | \
     tr -s '\n\r' ',' | grep -q ",0,"; then
   echo "!! ERROR: Failed test, found a test with 0 packet troughput!!"
 fi
@@ -185,15 +191,18 @@ fi
 # Check the 256 byte, 10 Flow test, and make sure they have at least 75%
 # of 10G line rate at L3 [3396739,1325pps]
 #
-if grep -h "^10," ~/pvp_results_1*_l3_dpdk/test_results_l3.csv | \
-	cut -d ',' -f 4 | \
-	awk '$1<3396739 {system("echo 1")} $1>=3396739{system("echo 2")}' | \
-	grep -q 1; then
 
-    echo "!! WARNING: L3 PVP test did not hit 75% of 10G line rate !!"
-    echo
-    echo "    NOTE: Depending on the expected throughput of the blade this might be a"
-    echo "          problem."
+if [[ ${DATAPATH} = "dpdk" ]]; then
+    if grep -h "^10," ~/pvp_results_1*_l3_dpdk/test_results_l3.csv | \
+	    cut -d ',' -f 4 | \
+	    awk '$1<3396739 {system("echo 1")} $1>=3396739{system("echo 2")}' | \
+	    grep -q 1; then
+
+	echo "!! WARNING: L3 PVP test did not hit 75% of 10G line rate !!"
+	echo
+	echo "    NOTE: Depending on the expected throughput of the blade this might be a"
+	echo "          problem."
+    fi
 fi
 
 echo
