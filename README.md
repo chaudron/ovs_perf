@@ -65,7 +65,7 @@ Now we can install the packages we need:
 ```
 yum -y clean all
 yum -y update
-yum -y install lshw emacs gcc git python-devel python-setuptools python-pip \
+yum -y install lshw emacs gcc git pciutils python-devel python-setuptools python-pip \
                tmux tuned-profiles-cpu-partitioning wget
 ```
 
