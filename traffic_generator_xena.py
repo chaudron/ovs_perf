@@ -448,8 +448,8 @@ class XenaNetworks(TrafficGeneratorChassis):
 
     def disconnect(self):
         del(self.__xena_manager)
-        self.__xena_socket = None
         self.__xena_socket.disconnect()
+        self.__xena_socket = None
         return False
 
     def is_connected(self):
