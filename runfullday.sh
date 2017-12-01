@@ -69,6 +69,9 @@ read PHY_INT
 echo -n "What is the virtual interface being used, i.e. vhost0, vnet0? "
 read VM_INT
 
+echo -n "What is the virtual interface PCI id? "
+read VM_PCI
+
 echo -n "What is the TRex tester physical interface being used? "
 read TREX_INT
 
@@ -93,7 +96,7 @@ cd ~/pvp_results_10_l2_$DATAPATH
   --physical-interface $PHY_INT \
   --physical-speed=10 \
   --virtual-interface $VM_INT \
-  --dut-vm-nic-pci=0000:00:02.0 \
+  --dut-vm-nic-pci=$VM_PCI \
   --no-bridge-config \
   --skip-pv-test \
   --flow-type=L2 \
@@ -117,7 +120,7 @@ cd ~/pvp_results_10_l3_$DATAPATH
   --physical-interface $PHY_INT \
   --physical-speed=10 \
   --virtual-interface $VM_INT \
-  --dut-vm-nic-pci=0000:00:02.0 \
+  --dut-vm-nic-pci=$VM_PCI \
   --no-bridge-config \
   --skip-pv-test \
   --flow-type=L3 \
@@ -141,7 +144,7 @@ cd ~/pvp_results_1_l2_$DATAPATH
   --physical-interface $PHY_INT \
   --physical-speed=10 \
   --virtual-interface $VM_INT \
-  --dut-vm-nic-pci=0000:00:02.0 \
+  --dut-vm-nic-pci=$VM_PCI \
   --no-bridge-config \
   --skip-pv-test \
   --flow-type=L2
@@ -164,7 +167,7 @@ cd ~/pvp_results_1_l3_$DATAPATH
   --physical-interface $PHY_INT \
   --physical-speed=10 \
   --virtual-interface $VM_INT \
-  --dut-vm-nic-pci=0000:00:02.0 \
+  --dut-vm-nic-pci=$VM_PCI \
   --no-bridge-config \
   --skip-pv-test \
   --flow-type=L3

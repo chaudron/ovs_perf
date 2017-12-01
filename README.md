@@ -1226,6 +1226,7 @@ What is the IP address of the virtual machine running on the DUT? 192.168.122.18
 What is the IP address of the TRex tester? localhost
 What is the physical interface being used, i.e. dpdk0, em1, p4p5? dpdk0
 What is the virtual interface being used, i.e. vhost0, vnet0? vhost0
+What is the virtual interface PCI id? 0000:00:06.0
 What is the TRex tester physical interface being used? 0
 - Connecting to the tester...
 - Connecting to DUT, "10.19.17.1
