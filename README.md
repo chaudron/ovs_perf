@@ -287,6 +287,8 @@ repositories, please contact your Red Had representative.
 ```
 subscription-manager repos --enable=rhel-7-fast-datapath-rpms
 subscription-manager repos --enable=rhel-7-server-rhv-4-mgmt-agent-rpms
+subscription-manager repos --enable rhel-7-server-extras-rpms
+subscription-manager repos --enable rhel-7-server-optional-rpms
 ```
 
 
