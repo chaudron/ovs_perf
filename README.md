@@ -204,7 +204,7 @@ the console if we want to:
 ```
 cd ~/trex/v2.29
 tmux
-./t-rex-64 -i
+./t-rex-64 -c 4 -i
 ```
 
 
@@ -380,6 +380,16 @@ systemctl enable tuned
 systemctl start tuned
 echo isolated_cores=1-13,15-27 >> /etc/tuned/cpu-partitioning-variables.conf
 tuned-adm profile cpu-partitioning
+```
+In addition, we would also like to remove these CPUs from the  SMP balancing
+and scheduler algroithms. With the tuned cpu-partitioning starting with version
+2.9.0-1 this can be done with the no_balance_cores= option. As this is not yet
+available to us, we have to do this using the isolcpus option on the kernel
+command line. This can be done as follows:
+
+```
+sed -i -e 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="isolcpus=1-13,15-27 /'  /etc/default/grub
+grub2-mkconfig -o /boot/grub2/grub.cfg
 ```
 
 
@@ -614,7 +624,7 @@ section above:
 [root@localhost ~]# yum -y update
 [root@localhost ~]# yum -y install driverctl gcc kernel-devel numactl-devel tuned-profiles-cpu-partitioning wget
 [root@localhost ~]# yum -y update kernel
-[root@localhost ~]# sed -i -e 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="default_hugepagesz=1G hugepagesz=1G hugepages=2 /'  /etc/default/grub
+[root@localhost ~]# sed -i -e 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="isolcpus=1,2,3 default_hugepagesz=1G hugepagesz=1G hugepages=2 /'  /etc/default/grub
 [root@localhost ~]# grub2-mkconfig -o /boot/grub2/grub.cfg
 [root@localhost ~]# echo "options vfio enable_unsafe_noiommu_mode=1" > /etc/modprobe.d/vfio.conf
 [root@localhost ~]# driverctl -v set-override 0000:00:02.0 vfio-pci
