@@ -136,6 +136,8 @@ class _TRexPort(TrafficGeneratorPort):
                                  packet_size, **kwargs):
 
         flow_percentage = kwargs.pop("percentage", 1000000) / 10000
+        trex_dest_mac = kwargs.pop("traffic_dest_mac", '00:02:00:00:00:01')
+        trex_src_mac = kwargs.pop("traffic_src_mac", '00:00:01:00:00:01')
 
         if traffic_flows == TrafficFlowType.none or \
            self.__traffic_flows != TrafficFlowType.none:
@@ -155,8 +157,8 @@ class _TRexPort(TrafficGeneratorPort):
                 raise ValueError("To many flows requested, max {} supported!".
                                  format(0x00ffffff))
 
-            L2 = Ether(src="00:00:01:00:00:01",
-                       dst="00:00:02:00:00:00")
+            L2 = Ether(src=trex_src_mac,
+                       dst=trex_dest_mac)
             L3 = IP(src="1.0.0.0",
                     dst="2.0.0.0")
             L4 = UDP(chksum=0)

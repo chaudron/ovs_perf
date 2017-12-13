@@ -123,6 +123,9 @@ DEFAULT_RUN_TIME                  = 20
 DEFAULT_STREAM_LIST               = '10, 1000, 10000, 100000, 1000000'
 DEFAULT_BRIDGE_NAME               = 'ovs_pvp_br0'
 DEFAULT_WARM_UP_TIMEOUT           = 360
+DEFAULT_DEST_MAC_ADDRESS          = '00:00:02:00:00:00'
+DEFAULT_SRC_MAC_ADDRESS           = '00:00:01:00:00:01'
+
 
 #
 # Run simple traffic test Virtual to Virtual
@@ -246,7 +249,9 @@ def test_p2v2p(nr_of_flows, packet_sizes):
         lprint("  * Initializing packet generation...")
         tester.configure_traffic_stream(config.tester_interface,
                                         get_traffic_generator_flow(),
-                                        nr_of_flows, packet_size)
+                                        nr_of_flows, packet_size,
+                                        traffic_dest_mac=config.dest_mac_address,
+                                        traffic_src_mac=config.src_mac_address)
 
         ##################################################
         if config.warm_up:
@@ -696,7 +701,8 @@ def test_vxlan(nr_of_flows, packet_sizes):
         tester.configure_traffic_stream(config.tester_interface,
                                         TrafficFlowType.vxlan_l3_ipv4,
                                         nr_of_flows, packet_size,
-                                        tunnel_dst_mac=tunnel_dst_mac)
+                                        tunnel_dst_mac=tunnel_dst_mac,
+                                        traffic_dest_mac=config.dest_mac_address)
 
         ##################################################
         lprint("  * Clear all statistics...")
@@ -982,37 +988,40 @@ def start_traffic_tx_on_vm(vm, nr_of_flows, packet_size):
               r"'rm -f ~/results.txt; " \
               r" nohup /bin/trafgen -c 3 -n 4 -- -p 1 --benchmark " \
               r"--flows-per-stream 1 --bursts-per-stream 1 --streams {3} " \
-              r"--src-mac 00:00:01:00:00:00 --dst-mac 00:00:02:00:00:00 " \
+              r"--src-mac {5} --dst-mac {6} " \
               r"--src-ip 1.0.0.0 --dst-ip 2.0.0.0 --packet-size {4} " \
               r"--vary-src mac --vary-dst mac -s ~/results.txt" \
               r"> /dev/null 2>&1 &'". \
               format(vm, config.dut_vm_user,
-                     config.dut_vm_password, nr_of_flows, packet_size)
+                     config.dut_vm_password, nr_of_flows, packet_size,
+                     config.src_mac_address, config.dest_mac_address)
     elif config.flow_type == 'L3':
         cmd = r"sshpass -p {2} ssh -o UserKnownHostsFile=/dev/null " \
               r"-o StrictHostKeyChecking=no -n {1}@{0} " \
               r"'rm -f ~/results.txt; " \
               r" nohup /bin/trafgen -c 3 -n 4 -- -p 1 --benchmark " \
               r"--flows-per-stream 1 --bursts-per-stream 1 --streams {3} " \
-              r"--src-mac 00:00:01:00:00:00 --dst-mac 00:00:02:00:00:00 " \
+              r"--src-mac {5} --dst-mac {6} " \
               r"--src-ip 1.0.0.0 --dst-ip 2.0.0.0 --packet-size {4} " \
               r"--vary-src ip --vary-dst ip -s ~/results.txt" \
               r"> /dev/null 2>&1 &'". \
               format(vm, config.dut_vm_user,
-                     config.dut_vm_password, nr_of_flows, packet_size)
+                     config.dut_vm_password, nr_of_flows, packet_size,
+                     config.src_mac_address, config.dest_mac_address)
     elif config.flow_type == 'L4-UDP':
         cmd = r"sshpass -p {2} ssh -o UserKnownHostsFile=/dev/null " \
               r"-o StrictHostKeyChecking=no -n {1}@{0} " \
               r"'rm -f ~/results.txt; " \
               r" nohup /bin/trafgen -c 3 -n 4 -- -p 1 --benchmark " \
               r"--flows-per-stream 1 --bursts-per-stream 1 --streams {3} " \
-              r"--src-mac 00:00:01:00:00:00 --dst-mac 00:00:02:00:00:00 " \
+              r"--src-mac {5} --dst-mac {6} " \
               r"--src-ip 1.0.0.0 --dst-ip 2.0.0.0 --packet-size {4} " \
               r"--src-port 0 --dst-port 0 " \
               r"--vary-src port --vary-dst port -s ~/results.txt" \
               r"> /dev/null 2>&1 &'". \
               format(vm, config.dut_vm_user,
-                     config.dut_vm_password, nr_of_flows, packet_size)
+                     config.dut_vm_password, nr_of_flows, packet_size,
+                     config.src_mac_address, config.dest_mac_address)
     else:
         raise ValueError("No support for this protocol on!!")
 
@@ -2681,6 +2690,11 @@ def main():
                         default=DEFAULT_SECOND_TESTER_INTERFACE)
     parser.add_argument("-l", "--logging", metavar="FILE",
                         help="Redirecting log output to file", type=str)
+    parser.add_argument("--dest-mac-address", help="Destination MAC address",
+                        type=str, default=DEFAULT_DEST_MAC_ADDRESS)
+    parser.add_argument("--src-mac-address", help="Source MAC address",
+                        type=str, default=DEFAULT_SRC_MAC_ADDRESS)
+
 
     config = parser.parse_args()
 
@@ -2721,6 +2735,14 @@ def main():
 
     if config.dut_vm_address == '':
         lprint("ERROR: You must supply the DUT VM host address to use for testing!")
+        sys.exit(-1)
+
+    if config.dest_mac_address == '':
+        lprint("ERROR: You must supply a Destination MAC Address")
+        sys.exit(-1)
+
+    if config.src_mac_address == '':
+        lprint("ERROR: You must supply a Source MAC Address")
         sys.exit(-1)
 
     if not check_pci_address_string(config.dut_vm_nic_pci):
@@ -2866,6 +2888,8 @@ def main():
     slogger.debug("  %-23.23s: %u Gbit/s", 'Physical Int. Speed', config.physical_speed)
     slogger.debug("  %-23.23s: %s", 'Virtual Interface', config.virtual_interface)
     slogger.debug("  %-23.23s: %s", '2nd Virtual Interface', config.second_virtual_interface)
+    slogger.debug("  %-23.23s: %s", 'Source MAC', config.src_mac_address)
+    slogger.debug("  %-23.23s: %s", 'Destination MAC', config.dest_mac_address)
     slogger.debug("  %-23.23s: %u seconds", 'Test run time', config.run_time)
     slogger.debug("  %-23.23s: %s", 'Run with stream size\'s', config.stream_list)
     slogger.debug("  %-23.23s: %s", 'Run with packet size\'s', config.packet_list)
