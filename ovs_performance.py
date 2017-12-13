@@ -123,8 +123,8 @@ DEFAULT_RUN_TIME                  = 20
 DEFAULT_STREAM_LIST               = '10, 1000, 10000, 100000, 1000000'
 DEFAULT_BRIDGE_NAME               = 'ovs_pvp_br0'
 DEFAULT_WARM_UP_TIMEOUT           = 360
-DEFAULT_DEST_MAC_ADDRESS          = '00:00:02:00:00:00'
-DEFAULT_SRC_MAC_ADDRESS           = '00:00:01:00:00:01'
+DEFAULT_DST_MAC_ADDRESS           = '00:00:02:00:00:00'
+DEFAULT_SRC_MAC_ADDRESS           = '00:00:01:00:00:00'
 
 
 #
@@ -250,7 +250,7 @@ def test_p2v2p(nr_of_flows, packet_sizes):
         tester.configure_traffic_stream(config.tester_interface,
                                         get_traffic_generator_flow(),
                                         nr_of_flows, packet_size,
-                                        traffic_dest_mac=config.dest_mac_address,
+                                        traffic_dst_mac=config.dst_mac_address,
                                         traffic_src_mac=config.src_mac_address)
 
         ##################################################
@@ -409,7 +409,9 @@ def test_p2v(nr_of_flows, packet_sizes):
         lprint("  * Initializing packet generation...")
         tester.configure_traffic_stream(config.tester_interface,
                                         get_traffic_generator_flow(),
-                                        nr_of_flows, packet_size)
+                                        nr_of_flows, packet_size,
+                                        traffic_dst_mac=config.dst_mac_address,
+                                        traffic_src_mac=config.src_mac_address)
 
         ##################################################
         if config.warm_up:
@@ -540,7 +542,9 @@ def test_p2p(nr_of_flows, packet_sizes):
         lprint("  * Initializing packet generation...")
         tester.configure_traffic_stream(config.tester_interface,
                                         get_traffic_generator_flow(),
-                                        nr_of_flows, packet_size)
+                                        nr_of_flows, packet_size,
+                                        traffic_dst_mac=config.dst_mac_address,
+                                        traffic_src_mac=config.src_mac_address)
 
         ##################################################
         if config.warm_up:
@@ -702,7 +706,7 @@ def test_vxlan(nr_of_flows, packet_sizes):
                                         TrafficFlowType.vxlan_l3_ipv4,
                                         nr_of_flows, packet_size,
                                         tunnel_dst_mac=tunnel_dst_mac,
-                                        traffic_dest_mac=config.dest_mac_address)
+                                        traffic_dst_mac=config.dst_mac_address)
 
         ##################################################
         lprint("  * Clear all statistics...")
@@ -994,7 +998,7 @@ def start_traffic_tx_on_vm(vm, nr_of_flows, packet_size):
               r"> /dev/null 2>&1 &'". \
               format(vm, config.dut_vm_user,
                      config.dut_vm_password, nr_of_flows, packet_size,
-                     config.src_mac_address, config.dest_mac_address)
+                     config.src_mac_address, config.dst_mac_address)
     elif config.flow_type == 'L3':
         cmd = r"sshpass -p {2} ssh -o UserKnownHostsFile=/dev/null " \
               r"-o StrictHostKeyChecking=no -n {1}@{0} " \
@@ -1007,7 +1011,7 @@ def start_traffic_tx_on_vm(vm, nr_of_flows, packet_size):
               r"> /dev/null 2>&1 &'". \
               format(vm, config.dut_vm_user,
                      config.dut_vm_password, nr_of_flows, packet_size,
-                     config.src_mac_address, config.dest_mac_address)
+                     config.src_mac_address, config.dst_mac_address)
     elif config.flow_type == 'L4-UDP':
         cmd = r"sshpass -p {2} ssh -o UserKnownHostsFile=/dev/null " \
               r"-o StrictHostKeyChecking=no -n {1}@{0} " \
@@ -1021,7 +1025,7 @@ def start_traffic_tx_on_vm(vm, nr_of_flows, packet_size):
               r"> /dev/null 2>&1 &'". \
               format(vm, config.dut_vm_user,
                      config.dut_vm_password, nr_of_flows, packet_size,
-                     config.src_mac_address, config.dest_mac_address)
+                     config.src_mac_address, config.dst_mac_address)
     else:
         raise ValueError("No support for this protocol on!!")
 
@@ -1219,6 +1223,7 @@ def create_ovs_l2_of_rules(number_of_flows, src_port, dst_port, **kwargs):
 
     total_nr_of_flows = kwargs.pop("total_number_of_flows", number_of_flows)
     clear_rules = kwargs.pop("clear_rules", True)
+    base_mac = mac_2_int(config.dst_mac_address) & 0xffffff000000
 
     if clear_rules:
         lprint("  * Clear all OpenFlow/Datapath rules on bridge \"{}\"...".
@@ -1230,14 +1235,14 @@ def create_ovs_l2_of_rules(number_of_flows, src_port, dst_port, **kwargs):
 
     lprint("  * Create {} L2 OpenFlow rules...".format(number_of_flows))
 
-    cmd = "python -c 'for i in range(0x02000000, {0}): " \
+    cmd = "python -c 'for i in range({4}, {0}): " \
           "print \"add in_port={2}," \
           "dl_dst={{0:02x}}:{{1:02x}}:{{2:02x}}:{{3:02x}}:{{4:02x}}:{{5:02x}}," \
           "action={3}\".format((i >> 40) & 0xff, (i >> 32) & 0xff, (i >> 24) " \
           "& 0xff, (i >> 16) & 0xff, (i >> 8) & 0xff, i & 0xff)'" \
           " | ovs-ofctl add-flow {1} -". \
-          format(number_of_flows + 0x02000000, config.bridge_name,
-                 src_port, dst_port)
+          format(number_of_flows + base_mac, config.bridge_name,
+                 src_port, dst_port, base_mac)
 
     dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd], die_on_error=True)
 
@@ -1807,6 +1812,13 @@ def get_of_port_packet_stats(of_port, **kwargs):
                   format(of_port, long(tx), long(tx_drop), long(rx), long(rx_drop)))
 
     return long(tx), long(tx_drop), long(rx), long(rx_drop)
+
+
+#
+# Convert a MAC address string to an integer
+#
+def mac_2_int(mac_str):
+    return int(mac_str.translate(None, ":"), 16)
 
 
 #
@@ -2690,11 +2702,12 @@ def main():
                         default=DEFAULT_SECOND_TESTER_INTERFACE)
     parser.add_argument("-l", "--logging", metavar="FILE",
                         help="Redirecting log output to file", type=str)
-    parser.add_argument("--dest-mac-address", help="Destination MAC address",
-                        type=str, default=DEFAULT_DEST_MAC_ADDRESS)
-    parser.add_argument("--src-mac-address", help="Source MAC address",
+    parser.add_argument("--dst-mac-address",
+                        help="Destination Base MAC address",
+                        type=str, default=DEFAULT_DST_MAC_ADDRESS)
+    parser.add_argument("--src-mac-address",
+                        help="Source Base MAC address",
                         type=str, default=DEFAULT_SRC_MAC_ADDRESS)
-
 
     config = parser.parse_args()
 
@@ -2737,13 +2750,25 @@ def main():
         lprint("ERROR: You must supply the DUT VM host address to use for testing!")
         sys.exit(-1)
 
-    if config.dest_mac_address == '':
-        lprint("ERROR: You must supply a Destination MAC Address")
+    if config.dst_mac_address == '':
+        lprint("ERROR: You must supply a Destination Base MAC Address")
         sys.exit(-1)
 
     if config.src_mac_address == '':
-        lprint("ERROR: You must supply a Source MAC Address")
+        lprint("ERROR: You must supply a Source Base MAC Address")
         sys.exit(-1)
+
+    if config.flow_type == 'L2':
+        if (int(config.src_mac_address.translate(None, ":"), 16) & 0xffffff) \
+           != 0:
+            lprint("ERROR: For L2 tests the Source Base MAC address must "
+                   "be xx:xx:xx:00:00:00")
+            sys.exit(-1)
+        if (int(config.dst_mac_address.translate(None, ":"), 16) & 0xffffff) \
+           != 0:
+            lprint("ERROR: For L2 tests the Destination Base MAC address must "
+                   "be xx:xx:xx:00:00:00")
+            sys.exit(-1)
 
     if not check_pci_address_string(config.dut_vm_nic_pci):
         lprint("ERROR: You must supply a valid PCI address for the VMs NIC!")
@@ -2889,7 +2914,7 @@ def main():
     slogger.debug("  %-23.23s: %s", 'Virtual Interface', config.virtual_interface)
     slogger.debug("  %-23.23s: %s", '2nd Virtual Interface', config.second_virtual_interface)
     slogger.debug("  %-23.23s: %s", 'Source MAC', config.src_mac_address)
-    slogger.debug("  %-23.23s: %s", 'Destination MAC', config.dest_mac_address)
+    slogger.debug("  %-23.23s: %s", 'Destination MAC', config.dst_mac_address)
     slogger.debug("  %-23.23s: %u seconds", 'Test run time', config.run_time)
     slogger.debug("  %-23.23s: %s", 'Run with stream size\'s', config.stream_list)
     slogger.debug("  %-23.23s: %s", 'Run with packet size\'s', config.packet_list)

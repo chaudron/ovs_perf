@@ -76,6 +76,13 @@ class _XenaNetworksPort(TrafficGeneratorPort):
     def _div_round_up(self, a, b):
         return (a + (-a % b)) / b
 
+    def _int_2_mac(self, mac_int):
+        mac_hex = "{:012x}".format(mac_int)
+        return ":".join(mac_hex[i:i+2] for i in range(0, len(mac_hex), 2))
+
+    def _mac_2_int(self, mac_str):
+        return int(mac_str.translate(None, ":"), 16)
+
     def clear_statistics(self):
         self.__xport.clear_all_rx_stats()
         self.__xport.clear_all_tx_stats()
@@ -111,22 +118,27 @@ class _XenaNetworksPort(TrafficGeneratorPort):
                                suppress, **kwargs):
 
         tunnel_dst_mac = kwargs.pop("tunnel_dst_mac", None)
-        traffic_dest_mac = kwargs.pop("traffic_dest_mac", '00:00:02:00:00:00')
-        traffic_src_mac = kwargs.pop("traffic_src_mac", '00:00:01:00:00:01')
+        traffic_dst_mac = kwargs.pop("traffic_dst_mac", '00:00:02:00:00:00')
+        traffic_src_mac = kwargs.pop("traffic_src_mac", '00:00:01:00:00:00')
 
         if traffic_flows == TrafficFlowType.l2_mac:
-            L2 = Ether(src="00:00:01:{:02X}:00:01".format(offset),
-                       dst="00:00:02:{:02X}:00:00".format(offset))
+            src_mac = (self._mac_2_int(traffic_src_mac) & 0xffffff000000) + \
+                      (offset * 0x010000)
+            dst_mac = (self._mac_2_int(traffic_dst_mac) & 0xffffff000000) + \
+                      (offset * 0x010000)
+            src_mac = self._int_2_mac(src_mac)
+            dst_mac = self._int_2_mac(dst_mac)
+            L2 = Ether(src=src_mac, dst=dst_mac)
             L3 = IP(src="1.0.0.0", dst="2.0.0.0")
             L4 = UDP(chksum=0)
         elif traffic_flows == TrafficFlowType.l3_ipv4 or \
              traffic_flows == TrafficFlowType.nfv_mobile:
-            L2 = Ether(src=traffic_src_mac, dst=traffic_dest_mac)
+            L2 = Ether(src=traffic_src_mac, dst=traffic_dst_mac)
             L3 = IP(src="1.{}.0.0".format(offset),
                     dst="2.{}.0.0".format(offset))
             L4 = UDP(chksum=0)
         elif traffic_flows == TrafficFlowType.l4_udp:
-            L2 = Ether(src=traffic_src_mac, dst=traffic_dest_mac)
+            L2 = Ether(src=traffic_src_mac, dst=traffic_dst_mac)
             L3 = IP(src="1.0.0.1", dst="2.0.0.1")
             L4 = UDP(sport=offset, dport=offset, chksum=0)
         elif traffic_flows == TrafficFlowType.vxlan_l3_ipv4:
@@ -141,7 +153,7 @@ class _XenaNetworksPort(TrafficGeneratorPort):
                 L2 = Ether(src="00:00:00:00:00:01", dst=tunnel_dst_mac)
             L3 = IP(src="3.1.1.2", dst="3.1.1.1")
             L4 = UDP(sport=32768, dport=4789, chksum=0)/VXLAN(vni=69, NextProtocol=0, flags='Instance')/ \
-                 Ether(src=traffic_src_mac, dst=traffic_dest_mac)/ \
+                 Ether(src=traffic_src_mac, dst=traffic_dst_mac)/ \
                  IP(src="1.{}.0.0".format(offset),
                     dst="2.{}.0.0".format(offset))/UDP(chksum=0)
         else:

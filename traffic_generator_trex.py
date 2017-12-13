@@ -79,6 +79,9 @@ class _TRexPort(TrafficGeneratorPort):
         self.__trex_rx_stats = dict()
         self.__trex_tx_stats = dict()
 
+    def _mac_2_int(self, mac_str):
+        return int(mac_str.translate(None, ":"), 16)
+
     def clear_statistics(self):
         self.__trex_client.clear_stats(ports=[self.__trex_port])
         self.__trex_rx_stats = dict()
@@ -136,8 +139,8 @@ class _TRexPort(TrafficGeneratorPort):
                                  packet_size, **kwargs):
 
         flow_percentage = kwargs.pop("percentage", 1000000) / 10000
-        trex_dest_mac = kwargs.pop("traffic_dest_mac", '00:02:00:00:00:01')
-        trex_src_mac = kwargs.pop("traffic_src_mac", '00:00:01:00:00:01')
+        trex_dst_mac = kwargs.pop("traffic_dst_mac", '00:00:02:00:00:00')
+        trex_src_mac = kwargs.pop("traffic_src_mac", '00:00:01:00:00:00')
 
         if traffic_flows == TrafficFlowType.none or \
            self.__traffic_flows != TrafficFlowType.none:
@@ -158,29 +161,31 @@ class _TRexPort(TrafficGeneratorPort):
                                  format(0x00ffffff))
 
             L2 = Ether(src=trex_src_mac,
-                       dst=trex_dest_mac)
+                       dst=trex_dst_mac)
             L3 = IP(src="1.0.0.0",
                     dst="2.0.0.0")
             L4 = UDP(chksum=0)
 
             if (len(str(L2/L3/L4)) + 4) > packet_size:  # +4 for Ethernet CRC
-                raise ValueError("Packet size ({} bytes) to small for requested "
-                                 "packet ({} bytes)!".
+                raise ValueError("Packet size ({} bytes) to small for"
+                                 "requested packet ({} bytes)!".
                                  format(packet_size, len(L2/L3/L4) + 4))
 
             if traffic_flows == TrafficFlowType.l2_mac:
+                src_base = self._mac_2_int(trex_src_mac) & 0xff000000
+                dst_base = self._mac_2_int(trex_dst_mac) & 0xff000000
                 vm = [
                     # Source MAC address
                     STLVmFlowVar(name="src",
-                                 min_value=0x01000001,
-                                 max_value=0x01000001 + nr_of_flows - 1,
+                                 min_value=src_base,
+                                 max_value=src_base + nr_of_flows - 1,
                                  size=4, op="inc"),
                     STLVmWrFlowVar(fv_name="src", pkt_offset=8),
 
                     # Destination MAC address
                     STLVmFlowVar(name="dst",
-                                 min_value=0x02000000,
-                                 max_value=0x02000000 + nr_of_flows - 1,
+                                 min_value=dst_base,
+                                 max_value=dst_base + nr_of_flows - 1,
                                  size=4, op="inc"),
                     STLVmWrFlowVar(fv_name="dst", pkt_offset=2)
                 ]
