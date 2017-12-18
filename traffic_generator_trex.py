@@ -80,6 +80,13 @@ class _TRexPort(TrafficGeneratorPort):
         self.__trex_tx_stats = dict()
         self.__alternate_stream_sets = []
         self.__active_alternate_stream = 0
+        #
+        # To make sure receive counters work, enable promiscuous mode
+        # when reserving the port.
+        #
+        self.clear_statistics()
+        self.__trex_client.set_port_attr(ports=self.__trex_port,
+                                         promiscuous=True)
 
     def _div_round_up(self, a, b):
         return (a + (-a % b)) / b
