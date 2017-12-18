@@ -291,6 +291,18 @@ subscription-manager repos --enable rhel-7-server-extras-rpms
 subscription-manager repos --enable rhel-7-server-optional-rpms
 ```
 
+__NOTE__: If the above gives an error, follow procedure at: https://access.redhat.com/solutions/3006821, basically:
+
+```
+subscription-manager unsubscribe --all
+yum clean all
+subscription-manager attach
+subscription-manager repos --disable="*"
+subscription-manager repos \
+--enable="rhel-7-server-extras-rpms" \
+--enable="rhel-7-fast-datapath-rpms"
+```
+
 
 Add the epel repository for sshpass and others:
 
@@ -633,6 +645,18 @@ section above:
 [root@localhost ~]# echo isolated_cores=1,2,3 >> /etc/tuned/cpu-partitioning-variables.conf
 [root@localhost ~]# tuned-adm profile cpu-partitioning
 [root@localhost ~]# reboot
+```
+
+__NOTE__: If the above registration for the _rhel-7-fast-datapath-rpms_ gives an error, follow procedure at: https://access.redhat.com/solutions/3006821, basically:
+
+```
+subscription-manager unsubscribe --all
+yum clean all
+subscription-manager attach
+subscription-manager repos --disable="*"
+subscription-manager repos \
+--enable="rhel-7-server-extras-rpms" \
+--enable="rhel-7-fast-datapath-rpms"
 ```
 
 
