@@ -146,3 +146,7 @@ class TrafficGenerator():
     def next_traffic_stream(self, port_name):
         return self.__traffic_generator. \
             next_traffic_stream(port_name)
+
+    def get_port_limits(self, port_name):
+        return self.__traffic_generator. \
+            get_port_limits(port_name)

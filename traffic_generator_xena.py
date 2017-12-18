@@ -252,6 +252,10 @@ class _XenaNetworksPort(TrafficGeneratorPort):
                                  packet_size, **kwargs):
 
         flow_percentage = kwargs.pop("percentage", 1000000)
+        l2_macs = kwargs.pop("l2_macs", 1)
+
+        if l2_macs > 1 and traffic_flows == TrafficFlowType.nfv_mobile:
+            raise ValueError("Xena only supports a single l2_mac!!!")
 
         if traffic_flows == TrafficFlowType.none or \
            self.__traffic_flows != TrafficFlowType.none:
@@ -407,6 +411,15 @@ class _XenaNetworksPort(TrafficGeneratorPort):
 
         return True
 
+    def get_port_limits(self):
+        #
+        # Return a dictionary for all limits per traffic type.
+        # For now we only implement the NFV mobile one.
+        #
+        return {TrafficFlowType.nfv_mobile: {
+            "MAX_L2_MACS": 1,
+            "MAX_FLOWS": 0xFFFFFF}}
+
 
 #
 # Xena Networks traffic generator class
@@ -545,3 +558,8 @@ class XenaNetworks(TrafficGeneratorChassis):
         if self._verify_port_action(port_name):
             return self.port_data[port_name].next_traffic_stream()
         return False
+
+    def get_port_limits(self, port_name):
+        if self._verify_port_action(port_name):
+            return self.port_data[port_name].get_port_limits()
+        return dict()

@@ -78,6 +78,11 @@ class _TRexPort(TrafficGeneratorPort):
         self.__trex_port = int(port_name)
         self.__trex_rx_stats = dict()
         self.__trex_tx_stats = dict()
+        self.__alternate_stream_sets = []
+        self.__active_alternate_stream = 0
+
+    def _div_round_up(self, a, b):
+        return (a + (-a % b)) / b
 
     def _mac_2_int(self, mac_str):
         return int(mac_str.translate(None, ":"), 16)
@@ -135,12 +140,22 @@ class _TRexPort(TrafficGeneratorPort):
         self.__traffic_flows = TrafficFlowType.none
         self.__trex_client.reset(ports=[self.__trex_port])
 
+        self.__streams = dict()
+        self.__alternate_stream_sets = []
+
     def configure_traffic_stream(self, traffic_flows, nr_of_flows,
                                  packet_size, **kwargs):
 
         flow_percentage = kwargs.pop("percentage", 1000000) / 10000
         trex_dst_mac = kwargs.pop("traffic_dst_mac", '00:00:02:00:00:00')
         trex_src_mac = kwargs.pop("traffic_src_mac", '00:00:01:00:00:00')
+        l2_macs = kwargs.pop("l2_macs", 1)
+
+        #
+        # The packet size passed here assumes it includes the checksum, however
+        # the TRex packet size does not. Adjust the size to correct this.
+        #
+        packet_size -= 4
 
         if traffic_flows == TrafficFlowType.none or \
            self.__traffic_flows != TrafficFlowType.none:
@@ -151,7 +166,8 @@ class _TRexPort(TrafficGeneratorPort):
             self._delete_traffic_stream_config()
 
         if traffic_flows == TrafficFlowType.l2_mac or \
-           traffic_flows == TrafficFlowType.l3_ipv4:
+           traffic_flows == TrafficFlowType.l3_ipv4 or \
+           traffic_flows == TrafficFlowType.nfv_mobile:
 
             #
             # Max flows due to IPv4 address limit, and addresses used for tests
@@ -191,6 +207,7 @@ class _TRexPort(TrafficGeneratorPort):
                 ]
 
             elif traffic_flows == TrafficFlowType.l3_ipv4:
+
                 src_end = str(netaddr.IPAddress(
                     int(netaddr.IPAddress('1.0.0.0')) +
                     nr_of_flows - 1))
@@ -212,8 +229,51 @@ class _TRexPort(TrafficGeneratorPort):
                     # Checksum
                     STLVmFixIpv4(offset="IP")
                 ]
+            elif traffic_flows == TrafficFlowType.nfv_mobile:
+
+                src_end = str(netaddr.IPAddress(
+                    int(netaddr.IPAddress('1.0.0.0')) +
+                    nr_of_flows - 1))
+                dst_end = str(netaddr.IPAddress(
+                    int(netaddr.IPAddress('2.0.0.0')) +
+                    nr_of_flows - 1))
+
+                vm = [
+                    # Source MAC address
+                    STLVmFlowVar(name="srcm",
+                                 min_value=0x01000001,
+                                 max_value=0x01000001 + l2_macs - 1,
+                                 size=4, op="inc"),
+                    STLVmWrFlowVar(fv_name="srcm", pkt_offset=8),
+
+                    # Destination MAC address
+                    STLVmFlowVar(name="dstm",
+                                 min_value=0x02000000,
+                                 max_value=0x02000000 + l2_macs - 1,
+                                 size=4, op="inc"),
+                    STLVmWrFlowVar(fv_name="dstm", pkt_offset=2),
+
+                    # Source IPv4 address
+                    STLVmFlowVar(name="src", min_value="1.0.0.0",
+                                 max_value=src_end, size=4, op="inc"),
+                    STLVmWrFlowVar(fv_name="src", pkt_offset="IP.src"),
+
+                    # Destination IPv4 address
+                    STLVmFlowVar(name="dst", min_value="2.0.0.0",
+                                 max_value=dst_end, size=4, op="inc"),
+                    STLVmWrFlowVar(fv_name="dst", pkt_offset="IP.dst"),
+
+                    # Checksum
+                    STLVmFixIpv4(offset="IP")
+                ]
+
             else:
                 raise ValueError("Unsupported traffic type for T-Rex tester!!!")
+
+            if traffic_flows == TrafficFlowType.nfv_mobile:
+                stream_percentage = flow_percentage / 2
+            else:
+                stream_percentage = flow_percentage
 
             headers = L2/L3/L4
             padding = max(0, (packet_size - len(headers))) * 'e'
@@ -222,23 +282,129 @@ class _TRexPort(TrafficGeneratorPort):
             trex_packet = STLPktBuilder(pkt=packet, vm=vm)
 
             trex_stream = STLStream(packet=trex_packet,
-                                    mode=STLTXCont(percentage=flow_percentage))
+                                    mode=STLTXCont(percentage=stream_percentage))
 
             self.__trex_client.add_streams(trex_stream,
                                            ports=[self.__trex_port])
 
-            return True
+            #
+            # For nfv_mobile we still need to setup the alternating streams.
+            #
+            if traffic_flows == TrafficFlowType.nfv_mobile:
+                alternate_flows = kwargs.pop("alternate_flows", 200000)
+                stream_percentage = flow_percentage / 2
 
+                self.__active_alternate_stream = 0
+                #
+                # Keep the flows the same as for the Xena version, so the
+                # traffic scripts using this do not have to differentiate
+                # between traffic generator types.
+                #
+                # The Xena uses streams and every stream can generate 64K
+                # flows. To Find the flow start we need the number of base
+                # flows rounded of the next 64K (stream) and use the next one.
+                #
+                # For the individual iterations of the flow set they also
+                # need to start at a 64K boundary.
+                #
+                start_stream_id = self._div_round_up(nr_of_flows, 0x10000) + 1
+                for alternate_flow_sets in range(0, 3):
+                    flow_start = start_stream_id * 0x10000
+
+                    src_start = str(netaddr.IPAddress(
+                        int(netaddr.IPAddress('1.0.0.0')) +
+                        flow_start))
+                    src_end = str(netaddr.IPAddress(
+                        int(netaddr.IPAddress('1.0.0.0')) +
+                        flow_start +
+                        alternate_flows - 1))
+                    dst_start = str(netaddr.IPAddress(
+                        int(netaddr.IPAddress('2.0.0.0')) +
+                        flow_start))
+                    dst_end = str(netaddr.IPAddress(
+                        int(netaddr.IPAddress('2.0.0.0')) +
+                        flow_start +
+                        alternate_flows - 1))
+
+                    vm = [
+                        # Source MAC address
+                        STLVmFlowVar(name="srcm",
+                                     min_value=0x01000001,
+                                     max_value=0x01000001 + l2_macs - 1,
+                                     size=4, op="inc"),
+                        STLVmWrFlowVar(fv_name="srcm", pkt_offset=8),
+
+                        # Destination MAC address
+                        STLVmFlowVar(name="dstm",
+                                     min_value=0x02000000,
+                                     max_value=0x02000000 + l2_macs - 1,
+                                     size=4, op="inc"),
+                        STLVmWrFlowVar(fv_name="dstm", pkt_offset=2),
+
+                        # Source IPv4 address
+                        STLVmFlowVar(name="src", min_value=src_start,
+                                     max_value=src_end, size=4, op="inc"),
+                        STLVmWrFlowVar(fv_name="src", pkt_offset="IP.src"),
+
+                        # Destination IPv4 address
+                        STLVmFlowVar(name="dst", min_value=dst_start,
+                                     max_value=dst_end, size=4, op="inc"),
+                        STLVmWrFlowVar(fv_name="dst", pkt_offset="IP.dst"),
+
+                        # Checksum
+                        STLVmFixIpv4(offset="IP")
+                    ]
+                    trex_packet = STLPktBuilder(pkt=packet, vm=vm)
+
+                    stream = STLStream(packet=trex_packet,
+                                       mode=STLTXCont(percentage=stream_percentage),
+                                       start_paused=False
+                                       if alternate_flow_sets == 0 else True)
+
+                    self.__alternate_stream_sets.append(
+                        self.__trex_client.add_streams(stream,
+                                                       ports=[self.__trex_port]))
+
+                    start_stream_id += self._div_round_up(alternate_flows, 0x10000)
+
+            self.__traffic_flows = traffic_flows
+            return True
         elif traffic_flows == TrafficFlowType.none:
+            self.__traffic_flows = traffic_flows
             return True
         else:
             raise ValueError("Unsupported traffic flow passed for T-Rex tester!")
 
+        self.__traffic_flows = TrafficFlowType.none
         return False
 
     def next_traffic_stream(self):
-        return False
+        if self.__traffic_flows != TrafficFlowType.nfv_mobile or \
+           len(self.__alternate_stream_sets) < 2:
+            return False
 
+        old_alternate_stream = self.__active_alternate_stream
+        self.__active_alternate_stream = (self.__active_alternate_stream + 1) \
+            % len(self.__alternate_stream_sets)
+
+        self.__trex_client.resume_streams(self.__trex_port,
+                                          [self.__alternate_stream_sets[
+                                              self.__active_alternate_stream]])
+
+        self.__trex_client.pause_streams(self.__trex_port,
+                                         [self.__alternate_stream_sets[
+                                             old_alternate_stream]])
+
+        return True
+
+    def get_port_limits(self):
+        #
+        # Return a dictionary for all limits per traffic type.
+        # For now we only implement the NFV mobile one.
+        #
+        return {TrafficFlowType.nfv_mobile: {
+            "MAX_L2_MACS": 1000000,
+            "MAX_FLOWS": 0xFFFFFF}}
 
 #
 # TRex chassis class
@@ -364,3 +530,8 @@ class TRex(TrafficGeneratorChassis):
         if self._verify_port_action(port_name):
             return self.port_data[port_name].next_traffic_stream()
         return False
+
+    def get_port_limits(self, port_name):
+        if self._verify_port_action(port_name):
+            return self.port_data[port_name].get_port_limits()
+        return dict()
