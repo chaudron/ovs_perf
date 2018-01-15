@@ -933,6 +933,7 @@ def stop_traffic_rx_on_vm(vm, **kwargs):
 def start_traffic_loop_on_vm(vm, pci):
     cpu_mask = ((1 << (config.dut_vm_nic_queues + 1)) - 1)
     pmd_cpu_mask = cpu_mask & ~0x1
+    mac_swap = " --forward-mode=macswap" if config.mac_swap else ""
 
     cmd = r"sshpass -p {2} ssh -o UserKnownHostsFile=/dev/null " \
           r"-o StrictHostKeyChecking=no -n {1}@{0} " \
@@ -942,10 +943,11 @@ def start_traffic_loop_on_vm(vm, pci):
           r" testpmd -c {5:x} -n 4 --socket-mem 2048,0 -w {3} -- "\
           r" --burst 64 --disable-hw-vlan -i --rxq={4} --txq={4} --rxd=4096 " \
           r" --txd=1024 --coremask={6:x} --auto-start " \
-          r' --port-topology=chained)" ' \
+          r' --port-topology=chained{7})" ' \
           r" &>results.txt &'". \
           format(vm, config.dut_vm_user, config.dut_vm_password, pci,
-                 config.dut_vm_nic_queues, cpu_mask, pmd_cpu_mask)
+                 config.dut_vm_nic_queues, cpu_mask, pmd_cpu_mask,
+                 mac_swap)
 
     dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd], die_on_error=True)
     time.sleep(2)
@@ -1223,7 +1225,9 @@ def create_ovs_l2_of_rules(number_of_flows, src_port, dst_port, **kwargs):
 
     total_nr_of_flows = kwargs.pop("total_number_of_flows", number_of_flows)
     clear_rules = kwargs.pop("clear_rules", True)
-    base_mac = mac_2_int(config.dst_mac_address) & 0xffffff000000
+    mac_swap = kwargs.pop("mac_swap", False)
+    base_mac = mac_2_int(config.dst_mac_address if not mac_swap
+                         else config.src_mac_address) & 0xffffff000000
 
     if clear_rules:
         lprint("  * Clear all OpenFlow/Datapath rules on bridge \"{}\"...".
@@ -1272,7 +1276,8 @@ def create_ovs_bidirectional_l2_of_rules(number_of_flows, src_port, dst_port, **
                            dst_port,
                            src_port,
                            total_number_of_flows=number_of_flows * 2,
-                           clear_rules=False)
+                           clear_rules=False,
+                           mac_swap=config.mac_swap)
 
 
 #
@@ -2708,6 +2713,9 @@ def main():
     parser.add_argument("--src-mac-address",
                         help="Source Base MAC address",
                         type=str, default=DEFAULT_SRC_MAC_ADDRESS)
+    parser.add_argument("--mac-swap",
+                        help="Swap source/destination mac at VM",
+                        action="store_true")
 
     config = parser.parse_args()
 
@@ -2913,6 +2921,7 @@ def main():
     slogger.debug("  %-23.23s: %u Gbit/s", 'Physical Int. Speed', config.physical_speed)
     slogger.debug("  %-23.23s: %s", 'Virtual Interface', config.virtual_interface)
     slogger.debug("  %-23.23s: %s", '2nd Virtual Interface', config.second_virtual_interface)
+    slogger.debug("  %-23.23s: %s", 'MAC swap', config.mac_swap)
     slogger.debug("  %-23.23s: %s", 'Source MAC', config.src_mac_address)
     slogger.debug("  %-23.23s: %s", 'Destination MAC', config.dst_mac_address)
     slogger.debug("  %-23.23s: %u seconds", 'Test run time', config.run_time)

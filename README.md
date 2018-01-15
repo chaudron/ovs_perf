@@ -777,8 +777,17 @@ cd ~/pvp_results/
 ```
 
 
-Now we can do a quick 64 bytes packet run with 1000 flows. For details on the
-supported PVP script options, see the [ovs_performance.py Supported Options](#options) chapter:
+Now we can do a quick 64 bytes packet run with 1000 flows to verify everything
+has been set up correctly.
+
+__NOTE:__ The PVP script assumes both machines are directly attached, i.e.
+there is no switch in between. If you do have a switch in between the best
+option is to disable learning. If this is not possible you need to use the
+--mac-swap option. This will swap the MAC addresses on the VM side, so the
+switch in the middle does not get confused.
+
+For details on the supported PVP script options, see the
+[ovs_performance.py Supported Options](#options) chapter.
 
 ```
 # ~/ovs_perf/ovs_performance.py \
