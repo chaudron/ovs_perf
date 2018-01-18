@@ -87,7 +87,7 @@ from traffic_generator import TrafficGenerator, TrafficGeneratorType
 # Imports from Matplot, by default disable the tk interface
 #
 import matplotlib
-
+matplotlib.use('Agg')
 #
 # Imports from natural sort
 #
@@ -1511,11 +1511,12 @@ def create_ovs_bridge():
     #
     # Add basic ports (1x ingress, and 1x egress)
     #
-    command += "-- add-port {0} {1} -- set Interface {1} ofport_request=10 " \
-               "-- add-port {0} {2} -- set Interface {2} ofport_request=20 ". \
-               format(config.bridge_name,
-                      config.physical_interface,
-                      config.virtual_interface)
+    command += "-- add-port {0} {1} -- set Interface {1} ofport_request=10 ". \
+               format(config.bridge_name, config.physical_interface)
+
+    if config.virtual_interface:
+               "-- add-port {0} {1} -- set Interface {1} ofport_request=20 ". \
+               format(config.bridge_name, config.virtual_interface)
 
     if dpdk:
         command += "-- set Interface {0} type=dpdk " \
@@ -1716,7 +1717,10 @@ def get_bridge_port_numbers(tunnel=False):
     # Create list of interfaces, second interfaces are optional,
     # so check if they exist before adding.
     #
-    interfaces = [config.physical_interface, config.virtual_interface]
+    interfaces = [config.physical_interface]
+    if config.virtual_interface != '':
+        interfaces.append(config.virtual_interface)
+
     if config.second_virtual_interface != '':
         interfaces.append(config.second_virtual_interface)
 
@@ -2754,7 +2758,8 @@ def main():
         lprint("ERROR: You must supply the OVS host address to use for testing!")
         sys.exit(-1)
 
-    if config.dut_vm_address == '':
+    if not config.skip_vv_test or not config.skip_pv_test or \
+       not config.skip_pvp_test and config.dut_vm_address == '':
         lprint("ERROR: You must supply the DUT VM host address to use for testing!")
         sys.exit(-1)
 
@@ -2778,11 +2783,14 @@ def main():
                    "be xx:xx:xx:00:00:00")
             sys.exit(-1)
 
-    if not check_pci_address_string(config.dut_vm_nic_pci):
+    if not config.skip_vv_test or not config.skip_pv_test or \
+       not config.skip_pvp_test and \
+       not check_pci_address_string(config.dut_vm_nic_pci):
         lprint("ERROR: You must supply a valid PCI address for the VMs NIC!")
         sys.exit(-1)
 
-    if not config.skip_vv_test and config.second_virtual_interface == '':
+    if not config.skip_vv_test or not config.skip_pv_test or \
+       not config.skip_pvp_test and config.second_virtual_interface == '':
         lprint("ERROR: You must supply a second virtual interface to use for testing!")
         sys.exit(-1)
 
@@ -2807,7 +2815,8 @@ def main():
         lprint("ERROR: You must supply the second physical interface to use for testing!")
         sys.exit(-1)
 
-    if config.virtual_interface == '':
+    if not config.skip_vv_test or not config.skip_pv_test or \
+       not config.skip_pvp_test and config.virtual_interface == '':
         lprint("ERROR: You must supply the virtual interface to use for testing!")
         sys.exit(-1)
 
