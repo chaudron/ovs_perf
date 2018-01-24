@@ -2789,8 +2789,7 @@ def main():
         lprint("ERROR: You must supply a valid PCI address for the VMs NIC!")
         sys.exit(-1)
 
-    if not config.skip_vv_test or not config.skip_pv_test or \
-       not config.skip_pvp_test and config.second_virtual_interface == '':
+    if not config.skip_vv_test and config.second_virtual_interface == '':
         lprint("ERROR: You must supply a second virtual interface to use for testing!")
         sys.exit(-1)
 
