@@ -1519,17 +1519,26 @@ def create_ovs_bridge():
                format(config.bridge_name, config.virtual_interface)
 
     if dpdk:
-        command += "-- set Interface {0} type=dpdk " \
-                   "-- set Interface {1} type=dpdkvhostuser ". \
-                   format(config.physical_interface, config.virtual_interface)
+        command += "-- set Interface {0} type=dpdk " . \
+                   format(config.physical_interface)
+
+        if config.virtual_interface:
+            command += "-- set Interface {0} type=dpdkvhostuser ". \
+                       format(config.virtual_interface)
 
         if config.pmd_rxq_affinity is not None:
-            command += "-- set Interface {0} options:n_rxq={2} " \
-                       "other_config:pmd-rxq-affinity={3} " \
-                       "-- set Interface {1} options:n_rxq={2} " \
-                       "other_config:pmd-rxq-affinity={3} ". \
-                       format(config.physical_interface, config.virtual_interface,
+            command += "-- set Interface {0} options:n_rxq={1} " \
+                       "other_config:pmd-rxq-affinity={2} " . \
+                       format(config.physical_interface,
                               config.pmd_rxq_affinity.count(':'), config.pmd_rxq_affinity)
+
+            if config.virtual_interface:
+                command += "-- set Interface {0} options:n_rxq={1} " \
+                           "other_config:pmd-rxq-affinity={2} ". \
+                           format(config.virtual_interface,
+                                  config.pmd_rxq_affinity.count(':'),
+                                  config.pmd_rxq_affinity)
+
 
     #
     # Add second virtual ports if vv test is enabled
@@ -1540,7 +1549,7 @@ def create_ovs_bridge():
                          config.second_virtual_interface)
 
         if dpdk:
-            command += "-- set Interface {} type=dpdkvhostuser ". \
+            command += "-- set Interface {0} type=dpdkvhostuser ". \
                         format(config.second_virtual_interface)
 
             if config.pmd_rxq_affinity is not None:
@@ -1561,10 +1570,12 @@ def create_ovs_bridge():
             command += "-- set Interface {0} type=dpdk ". \
                   format(config.second_physical_interface)
 
-            command += "-- set Interface {0} options:n_rxq={1} " \
-                       "other_config:pmd-rxq-affinity={2} ". \
-                       format(config.second_physical_interface,
-                              config.pmd_rxq_affinity.count(':'), config.pmd_rxq_affinity)
+            if config.pmd_rxq_affinity is not None:
+                command += "-- set Interface {0} options:n_rxq={1} " \
+                           "other_config:pmd-rxq-affinity={2} ". \
+                           format(config.second_physical_interface,
+                                  config.pmd_rxq_affinity.count(':'),
+                                  config.pmd_rxq_affinity)
 
     #
     # If we are running DPDK and it's 2.7 or higher we need to specify the PCI
@@ -1582,6 +1593,12 @@ def create_ovs_bridge():
         command += "-- set Interface {0} options:dpdk-devargs={1} ". \
                    format(config.physical_interface,
                           config.physical_interface_pci)
+
+        if config.second_physical_interface:
+            command += "-- set Interface {0} options:dpdk-devargs={1} " . \
+                       format(config.second_physical_interface,
+                              config.second_physical_interface_pci)
+
 
     #
     # Configure all the above!
