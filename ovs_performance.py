@@ -1612,7 +1612,7 @@ def create_ovs_bridge():
     # If this is DPDK, you might need to start the VM for thinks to start
     # working. So we pause here, asking for restart of the VM.
     #
-    if dpdk:
+    if dpdk and config.virtual_interface:
         print "!!! Finished configuring the OVS bridge, please restart the Virtual Machine !!!"
         raw_input("Press Enter to continue...")
 
