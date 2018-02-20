@@ -112,7 +112,7 @@ class _TRexPort(TrafficGeneratorPort):
 
     def get_tx_statistics_snapshots(self):
         stats = dict()
-        for timestamp, item in self.__trex_tx_stats.items():
+        for timestamp, item in list(self.__trex_tx_stats.items()):
             stats[timestamp] = {'pt_total': {'packets': item['opackets'],
                                              'bytes': item['obytes'],
                                              'errors': item['oerrors'],
@@ -123,7 +123,7 @@ class _TRexPort(TrafficGeneratorPort):
 
     def get_rx_statistics_snapshots(self):
         stats = dict()
-        for timestamp, item in self.__trex_rx_stats.items():
+        for timestamp, item in list(self.__trex_rx_stats.items()):
             stats[timestamp] = {'pr_total': {'packets': item['ipackets'],
                                              'bytes': item['ibytes'],
                                              'errors': item['ierrors'],
@@ -446,7 +446,7 @@ class TRex(TrafficGeneratorChassis):
 
     def disconnect(self):
         if self.is_connected:
-            for port in self.port_data.keys():
+            for port in list(self.port_data.keys()):
                 self.port_data[port] = self.release_port(port)
             self.__trex_client.disconnect()
         return True

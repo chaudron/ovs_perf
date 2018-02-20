@@ -1087,7 +1087,7 @@ def get_traffic_tx_stats_from_vm(vm):
 #
 def get_packets_per_second_from_traffic_generator_rx_stats(rx_stats):
     avg = cnt = 0
-    for timestamp in natsorted(rx_stats.keys())[2:-2]:
+    for timestamp in natsorted(list(rx_stats.keys()))[2:-2]:
         stats = rx_stats[timestamp]
         pps = stats['pr_total']['pps']
         avg += pps
@@ -1101,7 +1101,7 @@ def get_packets_per_second_from_traffic_generator_rx_stats(rx_stats):
 #
 def get_packets_per_second_from_traffic_generator_tx_stats(tx_stats):
     avg = cnt = 0
-    for timestamp in natsorted(tx_stats.keys())[2:-2]:
+    for timestamp in natsorted(list(tx_stats.keys()))[2:-2]:
         stats = tx_stats[timestamp]
         pps = stats['pt_total']['pps']
         avg += pps
@@ -1121,7 +1121,7 @@ def get_packets_per_second_from_pkt_counters(counters, strip):
                  format(counters, strip))
 
     counters_clean = re.sub(r'.+:\s?', '', counters)
-    counter_list = map(int, counters_clean.split())
+    counter_list = list(map(int, counters_clean.split()))
 
     if strip < 0 or (len(counter_list) - (strip * 2)) < 2:
         lprint("ERROR: No engough elements to calculate packet rate!")
@@ -1723,8 +1723,8 @@ def create_ovs_vxlan_bridge():
     # working. So we pause here, asking for restart of the VM.
     #
     if dpdk:
-        print "!!! Finished configuring the OVS bridge, please restart the Virtual Machine !!!"
-        raw_input("Press Enter to continue...")
+        print("!!! Finished configuring the OVS bridge, please restart the Virtual Machine !!!")
+        input("Press Enter to continue...")
 
 
 #
@@ -1855,9 +1855,9 @@ def get_of_port_packet_stats(of_port, **kwargs):
         sys.exit(-1)
 
     slogger.debug("OF port {0} stats: tx = {1}, tx_drop = {2}, rx = {3}, tx_drop = {3}".
-                  format(of_port, long(tx), long(tx_drop), long(rx), long(rx_drop)))
+                  format(of_port, int(tx), int(tx_drop), int(rx), int(rx_drop)))
 
-    return long(tx), long(tx_drop), long(rx), long(rx_drop)
+    return int(tx), int(tx_drop), int(rx), int(rx_drop)
 
 
 #
@@ -2091,7 +2091,7 @@ def create_multiple_graph(x, y, x_label, y_label,
     pps_plot.grid(b=True, which='minor', color='k', linestyle=':', alpha=0.2)
     pps_plot.minorticks_on()
 
-    for y_run in natsorted(y.keys()):
+    for y_run in natsorted(list(y.keys())):
         pps_plot.plot(x, y[y_run], 'o-', label="{}".format(y_run))
 
     #
@@ -2122,11 +2122,11 @@ def create_multiple_graph(x, y, x_label, y_label,
         bar_width = 0.11
         cpu_plot.set_title("Open vSwitch CPU utilization")
 
-        ovs_y_values = dict(zip(cpu_util.keys(),
-                                [[] for i in xrange(len(cpu_util))]))
+        ovs_y_values = dict(list(zip(list(cpu_util.keys()),
+                                [[] for i in range(len(cpu_util))])))
 
         for i in range(0, len(x)):
-            for key in cpu_util.keys():
+            for key in list(cpu_util.keys()):
                 ovs_y_values[key].append(cpu_util[key][i]['ovs_cpu'])
 
         if len(cpu_util) % 2 != 0:
@@ -2134,7 +2134,7 @@ def create_multiple_graph(x, y, x_label, y_label,
         else:
             align = 'edge'
 
-        for i, key in enumerate(natsorted(cpu_util.keys())):
+        for i, key in enumerate(natsorted(list(cpu_util.keys()))):
             colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
             x_pos = (x_cpu - (len(cpu_util) / 2 * bar_width)) + (i * bar_width)
             cpu_plot.bar(x_pos, ovs_y_values[key], bar_width, align=align,
@@ -2155,26 +2155,26 @@ def create_multiple_graph(x, y, x_label, y_label,
         #
         sys_plot.set_title("Total System CPU utilization")
 
-        usr_y_values = dict(zip(cpu_util.keys(),
-                                [[] for i in xrange(len(cpu_util))]))
-        nice_y_values = dict(zip(cpu_util.keys(),
-                                 [[] for i in xrange(len(cpu_util))]))
-        sys_y_values = dict(zip(cpu_util.keys(),
-                                [[] for i in xrange(len(cpu_util))]))
-        iowait_y_values = dict(zip(cpu_util.keys(),
-                                   [[] for i in xrange(len(cpu_util))]))
-        irq_y_values = dict(zip(cpu_util.keys(),
-                                [[] for i in xrange(len(cpu_util))]))
-        soft_y_values = dict(zip(cpu_util.keys(),
-                                 [[] for i in xrange(len(cpu_util))]))
-        steal_y_values = dict(zip(cpu_util.keys(),
-                                  [[] for i in xrange(len(cpu_util))]))
-        guest_y_values = dict(zip(cpu_util.keys(),
-                                  [[] for i in xrange(len(cpu_util))]))
-        gnice_y_values = dict(zip(cpu_util.keys(),
-                                  [[] for i in xrange(len(cpu_util))]))
-        idle_y_values = dict(zip(cpu_util.keys(),
-                                 [[] for i in xrange(len(cpu_util))]))
+        usr_y_values = dict(list(zip(list(cpu_util.keys()),
+                                [[] for i in range(len(cpu_util))])))
+        nice_y_values = dict(list(zip(list(cpu_util.keys()),
+                                 [[] for i in range(len(cpu_util))])))
+        sys_y_values = dict(list(zip(list(cpu_util.keys()),
+                                [[] for i in range(len(cpu_util))])))
+        iowait_y_values = dict(list(zip(list(cpu_util.keys()),
+                                   [[] for i in range(len(cpu_util))])))
+        irq_y_values = dict(list(zip(list(cpu_util.keys()),
+                                [[] for i in range(len(cpu_util))])))
+        soft_y_values = dict(list(zip(list(cpu_util.keys()),
+                                 [[] for i in range(len(cpu_util))])))
+        steal_y_values = dict(list(zip(list(cpu_util.keys()),
+                                  [[] for i in range(len(cpu_util))])))
+        guest_y_values = dict(list(zip(list(cpu_util.keys()),
+                                  [[] for i in range(len(cpu_util))])))
+        gnice_y_values = dict(list(zip(list(cpu_util.keys()),
+                                  [[] for i in range(len(cpu_util))])))
+        idle_y_values = dict(list(zip(list(cpu_util.keys()),
+                                 [[] for i in range(len(cpu_util))])))
 
         y_cpu_values = [usr_y_values, nice_y_values, sys_y_values,
                         iowait_y_values, irq_y_values, soft_y_values,
@@ -2188,7 +2188,7 @@ def create_multiple_graph(x, y, x_label, y_label,
                         '#98df8a', '#d62728', '#ff9896', '#9467bd', '#c5b0d5']
 
         for i in range(0, len(x)):
-            for key in cpu_util.keys():
+            for key in list(cpu_util.keys()):
                 for j, y_cpu_value in enumerate(y_cpu_values):
                     y_cpu_value[key].append(cpu_util[key][i][y_cpu_keys[j]])
 
@@ -2197,7 +2197,7 @@ def create_multiple_graph(x, y, x_label, y_label,
         else:
             align = 'edge'
 
-        for i, key in enumerate(natsorted(cpu_util.keys())):
+        for i, key in enumerate(natsorted(list(cpu_util.keys()))):
             x_pos = (x_cpu - (len(cpu_util) / 2 * bar_width)) + (i * bar_width)
 
             bottom = [0] * len(x)
@@ -2389,7 +2389,7 @@ def check_pci_address_string(pci_address):
 # is enabled else we end up with the same text on the console twice.
 #
 def lprint(msg):
-    print msg
+    print(msg)
     if config.logging is not None:
         slogger.info(msg)
 
@@ -2597,22 +2597,22 @@ flow_types = ['L2', 'L3', 'L4-UDP']
 
 
 def get_flow_type_short():
-    labels = dict(zip(flow_types,
-                      ['L2', 'L3', 'L4-UDP']))
+    labels = dict(list(zip(flow_types,
+                      ['L2', 'L3', 'L4-UDP'])))
     return labels[config.flow_type]
 
 
 def get_flow_type_name():
-    labels = dict(zip(flow_types,
-                      ['l2', 'l3', 'l4_udp']))
+    labels = dict(list(zip(flow_types,
+                      ['l2', 'l3', 'l4_udp'])))
     return labels[config.flow_type]
 
 
 def get_traffic_generator_flow():
-    flow_type = dict(zip(flow_types,
+    flow_type = dict(list(zip(flow_types,
                          [TrafficFlowType.l2_mac,
                           TrafficFlowType.l3_ipv4,
-                          TrafficFlowType.l4_udp]))
+                          TrafficFlowType.l4_udp])))
     return flow_type[config.flow_type]
 
 
@@ -2623,9 +2623,9 @@ traffic_tester_types = ['xena', 'trex']
 
 
 def get_traffic_generator_type():
-    traffic_generator_type = dict(zip(traffic_tester_types,
+    traffic_generator_type = dict(list(zip(traffic_tester_types,
                                       [TrafficGeneratorType.xena,
-                                       TrafficGeneratorType.trex]))
+                                       TrafficGeneratorType.trex])))
 
     return traffic_generator_type[config.tester_type]
 
