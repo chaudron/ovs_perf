@@ -863,7 +863,7 @@ def flush_ovs_flows():
 
     dut_shell.dut_exec(cmd, die_on_error=True)
 
-    if config.warm_up:
+    if config.warm_up or not config.no_cool_down:
         lprint("  * Doing flow table cool-down...")
         active_flows = get_active_datapath_flows()
         run_time = 0
@@ -2689,6 +2689,8 @@ def main():
                         default=DEFAULT_STREAM_LIST)
     parser.add_argument("--warm-up",
                         help="Do flow warm-up round before tests", action="store_true")
+    parser.add_argument("--no-cool-down",
+                        help="Do not wait for datapath flows to be cleared", action="store_true")
     parser.add_argument("-v", "--virtual-interface", metavar="DEVICE",
                         help="Virtual interface", type=str,
                         default=DEFAULT_VIRTUAL_INTERFACE)
@@ -2940,6 +2942,7 @@ def main():
     slogger.debug("  %-23.23s: %s", 'Skip VV test', config.skip_vv_test)
     slogger.debug("  %-23.23s: %s", 'Run PP test', config.run_pp_test)
     slogger.debug("  %-23.23s: %s", 'Warm-up', config.warm_up)
+    slogger.debug("  %-23.23s: %s", 'No-cool-down', config.no_cool_down)
 
     #
     # If we use the GUI, we need to set the correct back-end
