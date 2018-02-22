@@ -75,11 +75,17 @@ read VM_PCI
 echo -n "What is the TRex tester physical interface being used? "
 read TREX_INT
 
+echo -n "What is the link speed of the physical interface, i.e. 10(default),25,40,50,100? "
+read NIC_SPD
+case $NIC_SPD in
+10 | 25 | 40 | 50 | 100) ;;
+*) NIC_SPD=10 ;;
+esac
 
 #
 # Execute the four tests in order...
 #
-mkdir ~/pvp_results_10_l2_$DATAPATH
+mkdir -p ~/pvp_results_10_l2_$DATAPATH
 cd ~/pvp_results_10_l2_$DATAPATH
 ~/ovs_perf/ovs_performance.py \
   -d -l testrun_log.txt \
@@ -94,7 +100,7 @@ cd ~/pvp_results_10_l2_$DATAPATH
   --dut-vm-password root \
   --dut-vm-nic-queues=$NIC_Q \
   --physical-interface $PHY_INT \
-  --physical-speed=10 \
+  --physical-speed=$NIC_SPD \
   --virtual-interface $VM_INT \
   --dut-vm-nic-pci=$VM_PCI \
   --no-bridge-config \
@@ -103,7 +109,7 @@ cd ~/pvp_results_10_l2_$DATAPATH
   --run-time=1000
 
 
-mkdir ~/pvp_results_10_l3_$DATAPATH
+mkdir -p ~/pvp_results_10_l3_$DATAPATH
 cd ~/pvp_results_10_l3_$DATAPATH
 ~/ovs_perf/ovs_performance.py \
   -d -l testrun_log.txt \
@@ -118,7 +124,7 @@ cd ~/pvp_results_10_l3_$DATAPATH
   --dut-vm-password root \
   --dut-vm-nic-queues=$NIC_Q \
   --physical-interface $PHY_INT \
-  --physical-speed=10 \
+  --physical-speed=$NIC_SPD \
   --virtual-interface $VM_INT \
   --dut-vm-nic-pci=$VM_PCI \
   --no-bridge-config \
@@ -127,7 +133,7 @@ cd ~/pvp_results_10_l3_$DATAPATH
   --run-time=1000
 
 
-mkdir ~/pvp_results_1_l2_$DATAPATH
+mkdir -p ~/pvp_results_1_l2_$DATAPATH
 cd ~/pvp_results_1_l2_$DATAPATH
 ~/ovs_perf/ovs_performance.py \
   -d -l testrun_log.txt \
@@ -142,7 +148,7 @@ cd ~/pvp_results_1_l2_$DATAPATH
   --dut-vm-password root \
   --dut-vm-nic-queues=$NIC_Q \
   --physical-interface $PHY_INT \
-  --physical-speed=10 \
+  --physical-speed=$NIC_SPD \
   --virtual-interface $VM_INT \
   --dut-vm-nic-pci=$VM_PCI \
   --no-bridge-config \
@@ -150,7 +156,7 @@ cd ~/pvp_results_1_l2_$DATAPATH
   --flow-type=L2
 
 
-mkdir ~/pvp_results_1_l3_$DATAPATH
+mkdir -p ~/pvp_results_1_l3_$DATAPATH
 cd ~/pvp_results_1_l3_$DATAPATH
 ~/ovs_perf/ovs_performance.py \
   -d -l testrun_log.txt \
@@ -165,7 +171,7 @@ cd ~/pvp_results_1_l3_$DATAPATH
   --dut-vm-password root \
   --dut-vm-nic-queues=$NIC_Q \
   --physical-interface $PHY_INT \
-  --physical-speed=10 \
+  --physical-speed=$NIC_SPD \
   --virtual-interface $VM_INT \
   --dut-vm-nic-pci=$VM_PCI \
   --no-bridge-config \
@@ -192,22 +198,27 @@ fi
 
 #
 # Check the 256 byte, 10 Flow test, and make sure they have at least 75%
-# of 10G line rate at L3 [3396739,1325pps]
+# of 10G line rate at L3
 #
-
 if [[ ${DATAPATH} = "dpdk" ]]; then
-    if grep -h "^10," ~/pvp_results_1*_l3_dpdk/test_results_l3.csv | \
-	    cut -d ',' -f 4 | \
-	    awk '$1<3396739 {system("echo 1")} $1>=3396739{system("echo 2")}' | \
-	    grep -q 1; then
-
-	echo "!! WARNING: L3 PVP test did not hit 75% of 10G line rate !!"
-	echo
-	echo "    NOTE: Depending on the expected throughput of the blade this might be a"
-	echo "          problem."
-    fi
+    L3_10_DPDK=`grep -h "^10," ~/pvp_results_1*_l3_dpdk/test_results_l3.csv | \
+        cut -d ',' -f 4`
+    for L3_10_DPDK in $L3_10_DPDK; do
+        L3_10_OK=`bc <<-EOF
+		${L3_10_DPDK} >= (10000000000*0.75)/(8*(256+12+8))
+		EOF
+		`
+        case "$L3_10_OK" in
+        1) ;; # l3 pvp above 75% line rate
+        0|*)
+            echo "!! WARNING: L3 PVP test did not hit 75% of $NIC_SPD line rate !!"
+            echo
+            echo "    NOTE: Depending on the expected throughput of the blade this might be a"
+            echo "          problem."
+            ;;
+        esac
+    done
 fi
-
 echo
 echo "Please verify all the results and make sure they are within the expected"
 echo "rates for the blade!!"
