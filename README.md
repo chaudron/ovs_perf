@@ -393,6 +393,8 @@ systemctl start tuned
 echo isolated_cores=1-13,15-27 >> /etc/tuned/cpu-partitioning-variables.conf
 tuned-adm profile cpu-partitioning
 ```
+<a name="isolcpus"/>
+
 In addition, we would also like to remove these CPUs from the  SMP balancing
 and scheduler algroithms. With the tuned cpu-partitioning starting with version
 2.9.0-1 this can be done with the no_balance_cores= option. As this is not yet
@@ -1296,6 +1298,17 @@ All tests are done, results are saved in: "/root/pvp_results_2017-10-12_055506.t
 With the above setup, we ran the PVP tests with the Open vSwitch DPDK datapath.
 This section assumes you have the previous configuration running, and explains
 the steps to convert it to a Linux datapath setup.
+
+### Return back isolated CPUs
+
+When using the kernel datapath we only need to isolate the CPUs used by the
+Virtual Machine. Assuming the configuration as explained above these are
+3, 4, 5, 6, 7 and their hyper-threading pairs 17, 18, 19, 20, 21.
+
+Change ```isolated_cores=1-13,15-27``` to ```isolated_cores=3-7,17-21``` in ```/etc/tuned/cpu-partitioning-variables.conf```.
+In addition, you also need to change the ```isolcpus=1-13,15-27```
+on the kernel command line to  ```isolcpus=3-7,17-21```. See [above](#isolcpus)
+for more details on how to activate these changes.
 
 
 ### Release the DPDK NIC back to the kernel
