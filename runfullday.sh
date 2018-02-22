@@ -40,15 +40,15 @@ echo
 # Get all the configuration details from the user
 #
 unset DATAPATH
-while [[ ! ${DATAPATH} =~ ^dpdk|kernel$ ]]; do
-    echo -n "What datapath are you using, DPDK or Linux Kernel [dpdk/kernel]? "
+while [[ ! ${DATAPATH} =~ ^dpdk|kernel|tc$ ]]; do
+    echo -n "What datapath are you using, DPDK or Linux Kernel [dpdk/kernel/tc]? "
     read DATAPATH
 done
 
-if [[ ${DATAPATH} = "kernel" ]]; then
-  NIC_Q=1    
-else
+if [[ ${DATAPATH} = "dpdk" ]]; then
   NIC_Q=2
+else
+  NIC_Q=1
 fi
 
 echo -n "What is the IP address where the DUT (Open vSwitch) is running? "
