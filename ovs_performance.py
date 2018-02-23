@@ -256,14 +256,13 @@ def test_p2v2p(nr_of_flows, packet_sizes):
         ##################################################
         if config.warm_up:
             lprint("  * Doing flow table warm-up...")
+            start_vm_time = datetime.datetime.now()
             start_traffic_loop_on_vm(config.dut_vm_address,
                                      config.dut_vm_nic_pci)
 
             tester.start_traffic(config.tester_interface)
 
             warm_up_verify(nr_of_flows * 2, DEFAULT_WARM_UP_TIMEOUT)
-
-            stop_traffic_loop_on_vm(config.dut_vm_address)
 
             tester.stop_traffic(config.tester_interface)
 
@@ -277,9 +276,19 @@ def test_p2v2p(nr_of_flows, packet_sizes):
             = get_of_port_packet_stats(of_interfaces[config.virtual_interface])
 
         ##################################################
-        lprint("  * Start packet receiver on VM...")
-        start_traffic_loop_on_vm(config.dut_vm_address,
-                                 config.dut_vm_nic_pci)
+        if not config.warm_up:
+            lprint("  * Start packet receiver on VM...")
+            start_traffic_loop_on_vm(config.dut_vm_address,
+                                     config.dut_vm_nic_pci)
+            warm_up_time = 0
+        else:
+            # warm_up_time is the total time it takes from the start of the
+            # VM at warm-up till we would normally start the loop back VM.
+            # This values is used to remove warm-up statistics.
+            warm_up_time = int(np.ceil((datetime.datetime.now() -
+                                        start_vm_time).total_seconds()))
+            lprint("  * Determine warm op time, {} seconds...".
+                   format(warm_up_time))
 
         ##################################################
         lprint("  * Start CPU monitoring on DUT...")
@@ -330,7 +339,8 @@ def test_p2v2p(nr_of_flows, packet_sizes):
         vp_rx_drop = vp_rx_drop_end - vp_rx_drop_start
         vp_tx_drop = vp_tx_drop_end - vp_tx_drop_start
 
-        vm_pkts_sec = get_traffic_rx_stats_from_vm(config.dut_vm_address)
+        vm_pkts_sec = get_traffic_rx_stats_from_vm(config.dut_vm_address,
+                                                   skip_samples=warm_up_time)
 
         packets_tx = full_tx_stats[sorted(full_tx_stats.keys())[-1]]['pt_total']['packets']
         packets_rx = full_rx_stats[sorted(full_rx_stats.keys())[-1]]['pr_total']['packets']
@@ -963,7 +973,9 @@ def stop_traffic_loop_on_vm(vm):
 #
 # Get traffic receive stats from application on VM
 #
-def get_traffic_rx_stats_from_vm(vm):
+def get_traffic_rx_stats_from_vm(vm, **kwargs):
+    skip_samples = kwargs.pop("skip_samples", 0)
+
     cmd = r"sshpass -p {2} ssh -o UserKnownHostsFile=/dev/null " \
           r"-o StrictHostKeyChecking=no -n {1}@{0} " \
           "'cat ~/results.txt | grep -E \"Rx-pps|Tx-pps\"'". \
@@ -975,6 +987,9 @@ def get_traffic_rx_stats_from_vm(vm):
                  for s in re.findall(r'^\s*Rx-pps:\s*\d+$', result.stdout_output,
                                      re.MULTILINE)]
 
+    if skip_samples > 0:
+        pkt_rates = pkt_rates[skip_samples:]
+        
     if len(pkt_rates) <= 10:
         lprint("ERROR: No engough elements to calculate packet rate!")
         sys.exit(-1)
@@ -2760,8 +2775,8 @@ def main():
         lprint("ERROR: You must supply the OVS host address to use for testing!")
         sys.exit(-1)
 
-    if not config.skip_vv_test or not config.skip_pv_test or \
-       not config.skip_pvp_test and config.dut_vm_address == '':
+    if (not config.skip_vv_test or not config.skip_pv_test or \
+       not config.skip_pvp_test ) and config.dut_vm_address == '':
         lprint("ERROR: You must supply the DUT VM host address to use for testing!")
         sys.exit(-1)
 
@@ -2785,9 +2800,9 @@ def main():
                    "be xx:xx:xx:00:00:00")
             sys.exit(-1)
 
-    if not config.skip_vv_test or not config.skip_pv_test or \
-       not config.skip_pvp_test and \
-       not check_pci_address_string(config.dut_vm_nic_pci):
+    if (not config.skip_vv_test or not config.skip_pv_test or \
+        not config.skip_pvp_test ) and \
+        not check_pci_address_string(config.dut_vm_nic_pci):
         lprint("ERROR: You must supply a valid PCI address for the VMs NIC!")
         sys.exit(-1)
 
@@ -2816,8 +2831,8 @@ def main():
         lprint("ERROR: You must supply the second physical interface to use for testing!")
         sys.exit(-1)
 
-    if not config.skip_vv_test or not config.skip_pv_test or \
-       not config.skip_pvp_test and config.virtual_interface == '':
+    if (not config.skip_vv_test or not config.skip_pv_test or \
+       not config.skip_pvp_test) and config.virtual_interface == '':
         lprint("ERROR: You must supply the virtual interface to use for testing!")
         sys.exit(-1)
 
