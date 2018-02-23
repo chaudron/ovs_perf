@@ -69,7 +69,7 @@ class DutSshShell(SshShell):
                                         result.output,
                                         result.stderr_output)
 
-        except spur.errors.NoSuchCommandError, e:
+        except spur.errors.NoSuchCommandError as e:
             result = DutExecutionResult(-100, "", e.message)
             pass
 
@@ -78,8 +78,8 @@ class DutSshShell(SshShell):
         self.logger.debug("STDERR: >>{}<<END".format(result.stderr_output))
 
         if result.return_code != 0 and die_on_error == True:
-            print "ERROR[%d]: Failed executing command, \"%s\", on DUT \"%s\"" \
-                %(result.return_code, " ".join(command), self._hostname)
+            print("ERROR[%d]: Failed executing command, \"%s\", on DUT \"%s\"" \
+                %(result.return_code, " ".join(command), self._hostname))
             sys.exit(-1)
 
         return result
