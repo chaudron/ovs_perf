@@ -52,8 +52,7 @@ os.environ['TREX_STL_EXT_PATH'] = os.path.normpath(os.path.join(
     os.path.dirname(os.path.realpath(__file__)),
     "./trex_stl_lib/external_libs/"))
 
-from trex_stl_lib.api import STLClient, STLError, STLPktBuilder, STLStream, \
-    STLTXCont, STLVmFixIpv4, STLVmFlowVar, STLVmWrFlowVar
+from trex_stl_lib.api import STLClient, STLError, STLPktBuilder, STLStream, STLTXCont, STLVmFixIpv4, STLVmFlowVar, STLVmWrFlowVar
 
 
 #
@@ -189,10 +188,10 @@ class _TRexPort(TrafficGeneratorPort):
                     dst="2.0.0.0")
             L4 = UDP(chksum=0)
 
-            if (len(str(L2/L3/L4)) + 4) > packet_size:  # +4 for Ethernet CRC
-                raise ValueError("Packet size ({} bytes) to small for"
-                                 "requested packet ({} bytes)!".
-                                 format(packet_size, len(L2/L3/L4) + 4))
+            #if (len(str(L2/L3/L4)) + 4) > packet_size:  # +4 for Ethernet CRC
+            #    raise ValueError("Packet size ({} bytes) to small for"
+            #                     "requested packet ({} bytes)!".
+            #                     format(packet_size, len(L2/L3/L4) + 4))
 
             if traffic_flows == TrafficFlowType.l2_mac:
                 src_base = self._mac_2_int(trex_src_mac) & 0xff000000
