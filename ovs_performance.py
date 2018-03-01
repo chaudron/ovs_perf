@@ -1530,8 +1530,8 @@ def create_ovs_bridge():
                format(config.bridge_name, config.physical_interface)
 
     if config.virtual_interface:
-               "-- add-port {0} {1} -- set Interface {1} ofport_request=20 ". \
-               format(config.bridge_name, config.virtual_interface)
+        command += "-- add-port {0} {1} -- set Interface {1} ofport_request=20 ". \
+                   format(config.bridge_name, config.virtual_interface)
 
     if dpdk:
         command += "-- set Interface {0} type=dpdk " \
