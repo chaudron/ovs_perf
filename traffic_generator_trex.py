@@ -153,7 +153,7 @@ class _TRexPort(TrafficGeneratorPort):
     def configure_traffic_stream(self, traffic_flows, nr_of_flows,
                                  packet_size, **kwargs):
 
-        flow_percentage = kwargs.pop("percentage", 1000000) / 10000
+        flow_percentage = float(kwargs.pop("percentage", 1000000)) / 10000
         trex_dst_mac = kwargs.pop("traffic_dst_mac", '00:00:02:00:00:00')
         trex_src_mac = kwargs.pop("traffic_src_mac", '00:00:01:00:00:00')
         l2_macs = kwargs.pop("l2_macs", 1)
