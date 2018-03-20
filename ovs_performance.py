@@ -67,6 +67,7 @@ import inspect
 import os
 import logging
 import numpy as np
+import pdb
 import re
 import spur
 import sys
@@ -81,13 +82,17 @@ from dut_ssh_shell import DutSshShell
 # Import general traffic_generator library
 #
 from traffic_generator_base import TrafficFlowType
-from traffic_generator import TrafficGenerator, TrafficGeneratorType
+from traffic_generator import TrafficGenerator
+from traffic_generator import TrafficGeneratorType
+
 
 #
 # Imports from Matplot, by default disable the tk interface
 #
 import matplotlib
 matplotlib.use('Agg')
+
+
 #
 # Imports from natural sort
 #
@@ -826,7 +831,7 @@ def get_active_datapath_flows():
         cmd = 'sh -c "ovs-appctl dpctl/dump-flows system@ovs-system | wc -l"'
 
     result = dut_shell.dut_exec(cmd, die_on_error=True)
-    return int(result.stdout_output)
+    return int(result.stdout_output.decode("utf-8", "ignore"))
 
 
 #
@@ -984,7 +989,7 @@ def get_traffic_rx_stats_from_vm(vm, **kwargs):
     result = dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd], die_on_error=True)
 
     pkt_rates = [int(re.sub(r'^\s*Rx-pps:\s*', '', s))
-                 for s in re.findall(r'^\s*Rx-pps:\s*\d+$', result.stdout_output,
+                 for s in re.findall(r'^\s*Rx-pps:\s*\d+$', result.stdout_output.decode("utf-8", "ignore"),
                                      re.MULTILINE)]
 
     if skip_samples > 0:
@@ -1074,7 +1079,7 @@ def get_traffic_tx_stats_from_vm(vm):
 
     result = dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd], die_on_error=True)
 
-    return get_packets_per_second_from_pkt_counters(result.stdout_output, 5)
+    return get_packets_per_second_from_pkt_counters(result.stdout_output.decode("utf-8", "ignore"), 5)
 
 
 #
@@ -1082,7 +1087,7 @@ def get_traffic_tx_stats_from_vm(vm):
 #
 def get_packets_per_second_from_traffic_generator_rx_stats(rx_stats):
     avg = cnt = 0
-    for timestamp in natsorted(rx_stats.keys())[2:-2]:
+    for timestamp in natsorted(list(rx_stats.keys()))[2:-2]:
         stats = rx_stats[timestamp]
         pps = stats['pr_total']['pps']
         avg += pps
@@ -1096,7 +1101,7 @@ def get_packets_per_second_from_traffic_generator_rx_stats(rx_stats):
 #
 def get_packets_per_second_from_traffic_generator_tx_stats(tx_stats):
     avg = cnt = 0
-    for timestamp in natsorted(tx_stats.keys())[2:-2]:
+    for timestamp in natsorted(list(tx_stats.keys()))[2:-2]:
         stats = tx_stats[timestamp]
         pps = stats['pt_total']['pps']
         avg += pps
@@ -1116,7 +1121,7 @@ def get_packets_per_second_from_pkt_counters(counters, strip):
                  format(counters, strip))
 
     counters_clean = re.sub(r'.+:\s?', '', counters)
-    counter_list = map(int, counters_clean.split())
+    counter_list = list(map(int, counters_clean.split()))
 
     if strip < 0 or (len(counter_list) - (strip * 2)) < 2:
         lprint("ERROR: No engough elements to calculate packet rate!")
@@ -1273,9 +1278,9 @@ def create_ovs_l2_of_rules(number_of_flows, src_port, dst_port, **kwargs):
                                  format(config.bridge_name),
                                  die_on_error=True)
 
-        if int(result.stdout_output) != total_nr_of_flows:
+        if int(result.stdout_output.decode("utf-8", "ignore")) != total_nr_of_flows:
             lprint("ERROR: Only {0} flows should exsits, but there are {1}!".
-                   format(number_of_flows, int(result.stdout_output)))
+                   format(number_of_flows, int(result.stdout_output.decode("utf-8", "ignore"))))
             sys.exit(-1)
 
 
@@ -1340,10 +1345,11 @@ def create_ovs_l3_of_rules(number_of_flows, src_port, dst_port, **kwargs):
                                  format(config.bridge_name),
                                  die_on_error=True)
 
-        if int(result.stdout_output) != total_nr_of_flows:
+        if int(result.stdout_output.decode("utf-8", "ignore")) != total_nr_of_flows:
             lprint("ERROR: Only {0} flows should exsits, but there are {1}!".
-                   format(number_of_flows, int(result.stdout_output)))
-            sys.exit(-1)
+                   format(number_of_flows, int(result.stdout_output.decode("utf-8", "ignore"), 5)))
+
+
 
 #
 # Add OVS Bidirectional L3 OpenFlow rules
@@ -1424,10 +1430,11 @@ def create_ovs_l3_of_slash_16_rules(number_of_flows,
                                  format(config.bridge_name),
                                  die_on_error=True)
 
-        if int(result.stdout_output) != total_nr_of_flows:
+        if int(result.stdout_output.decode("utf-8", "ignore")) != total_nr_of_flows:
             lprint("ERROR: Only {0} flows should exsits, but there are {1}!".
                    format(number_of_flows, int(result.stdout_output)))
             sys.exit(-1)
+
 
 
 #
@@ -1474,9 +1481,9 @@ def create_ovs_l4_of_rules(number_of_flows, src_port, dst_port, **kwargs):
                                  format(config.bridge_name),
                                  die_on_error=True)
 
-        if int(result.stdout_output) != total_nr_of_flows:
+        if int(result.stdout_output.decode("utf-8", "ignore")) != total_nr_of_flows:
             lprint("ERROR: Only {0} flows should exsits, but there are {1}!".
-                   format(number_of_flows, int(result.stdout_output)))
+                   format(number_of_flows, int(result.stdout_output.decode("utf-8", "ignore"))))
             sys.exit(-1)
 
 #
@@ -1497,6 +1504,7 @@ def create_ovs_bidirectional_l4_of_rules(number_of_flows, src_port, dst_port, **
 #
 # Add test bridge setup
 #
+
 def create_ovs_bridge():
     lprint("- Configuring bridge...")
 
@@ -1611,8 +1619,8 @@ def create_ovs_bridge():
     # working. So we pause here, asking for restart of the VM.
     #
     if dpdk:
-        print "!!! Finished configuring the OVS bridge, please restart the Virtual Machine !!!"
-        raw_input("Press Enter to continue...")
+        print("!!! Finished configuring the OVS bridge, please restart the Virtual Machine !!!")
+        eval(input("Press Enter to continue..."))
 
 
 #
@@ -1701,8 +1709,8 @@ def create_ovs_vxlan_bridge():
     # working. So we pause here, asking for restart of the VM.
     #
     if dpdk:
-        print "!!! Finished configuring the OVS bridge, please restart the Virtual Machine !!!"
-        raw_input("Press Enter to continue...")
+        print("!!! Finished configuring the OVS bridge, please restart the Virtual Machine !!!")
+        eval(input("Press Enter to continue..."))
 
 
 #
@@ -1747,7 +1755,7 @@ def get_bridge_port_numbers(tunnel=False):
 
     for interface in interfaces:
         m = re.search('\s*([0-9]*)\({0}\): addr:.*'.format(interface),
-                      result.output)
+                      result.output.decode("utf-8", "ignore"))
         if m:
             of[interface] = m.group(1)
         else:
@@ -1759,7 +1767,7 @@ def get_bridge_port_numbers(tunnel=False):
             continue
 
         m = re.search('\s*port\s*([0-9]*):\s*{0}\s*.*'.format(interface),
-                      result.output)
+                      result.output.decode("utf-8", "ignore"))
         if m:
             dp[interface] = m.group(1)
         else:
@@ -1782,7 +1790,7 @@ def get_of_port_packet_stats(of_port, **kwargs):
     port_stats = of_dump_port_to_logfile(bridge)
 
     m = re.search('\s.*port *{}: rx pkts=.*\n.*tx pkts=([0-9?]*), '.format(of_port),
-                  port_stats.output)
+                  port_stats.output.decode("utf-8", "ignore"))
     if m:
         if '?' in m.group(1):
             tx = 0
@@ -1795,7 +1803,7 @@ def get_of_port_packet_stats(of_port, **kwargs):
         sys.exit(-1)
 
     m = re.search('\s.*port *{}: rx pkts=.*\n.*tx pkts=.* drop=([0-9?]*), .*'.format(of_port),
-                  port_stats.output)
+                  port_stats.output.decode("utf-8", "ignore"))
     if m:
         if '?' in m.group(1):
             tx_drop = 0
@@ -1808,7 +1816,7 @@ def get_of_port_packet_stats(of_port, **kwargs):
         sys.exit(-1)
 
     m = re.search('\s.*port *{}: rx pkts=([0-9?]*), .*'.format(of_port),
-                  port_stats.output)
+                  port_stats.output.decode("utf-8", "ignore"))
     if m:
         if '?' in m.group(1):
             rx = 0
@@ -1821,7 +1829,7 @@ def get_of_port_packet_stats(of_port, **kwargs):
         sys.exit(-1)
 
     m = re.search('\s.*port *{}: rx pkts=.* drop=([0-9?]*), .*'.format(of_port),
-                  port_stats.output)
+                  port_stats.output.decode("utf-8", "ignore"))
     if m:
         if '?' in m.group(1):
             rx_drop = 0
@@ -1833,9 +1841,9 @@ def get_of_port_packet_stats(of_port, **kwargs):
         sys.exit(-1)
 
     slogger.debug("OF port {0} stats: tx = {1}, tx_drop = {2}, rx = {3}, tx_drop = {3}".
-                  format(of_port, long(tx), long(tx_drop), long(rx), long(rx_drop)))
+                  format(of_port, int(tx), int(tx_drop), int(rx), int(rx_drop)))
 
-    return long(tx), long(tx_drop), long(rx), long(rx_drop)
+    return int(tx), int(tx_drop), int(rx), int(rx_drop)
 
 
 #
@@ -2069,7 +2077,7 @@ def create_multiple_graph(x, y, x_label, y_label,
     pps_plot.grid(b=True, which='minor', color='k', linestyle=':', alpha=0.2)
     pps_plot.minorticks_on()
 
-    for y_run in natsorted(y.keys()):
+    for y_run in natsorted(list(y.keys())):
         pps_plot.plot(x, y[y_run], 'o-', label="{}".format(y_run))
 
     #
@@ -2100,11 +2108,11 @@ def create_multiple_graph(x, y, x_label, y_label,
         bar_width = 0.11
         cpu_plot.set_title("Open vSwitch CPU utilization")
 
-        ovs_y_values = dict(zip(cpu_util.keys(),
-                                [[] for i in xrange(len(cpu_util))]))
+        ovs_y_values = dict(list(zip(list(cpu_util.keys()),
+                                [[] for i in range(len(cpu_util))])))
 
         for i in range(0, len(x)):
-            for key in cpu_util.keys():
+            for key in list(cpu_util.keys()):
                 ovs_y_values[key].append(cpu_util[key][i]['ovs_cpu'])
 
         if len(cpu_util) % 2 != 0:
@@ -2112,7 +2120,7 @@ def create_multiple_graph(x, y, x_label, y_label,
         else:
             align = 'edge'
 
-        for i, key in enumerate(natsorted(cpu_util.keys())):
+        for i, key in enumerate(natsorted(list(cpu_util.keys()))):
             colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
             x_pos = (x_cpu - (len(cpu_util) / 2 * bar_width)) + (i * bar_width)
             cpu_plot.bar(x_pos, ovs_y_values[key], bar_width, align=align,
@@ -2133,26 +2141,26 @@ def create_multiple_graph(x, y, x_label, y_label,
         #
         sys_plot.set_title("Total System CPU utilization")
 
-        usr_y_values = dict(zip(cpu_util.keys(),
-                                [[] for i in xrange(len(cpu_util))]))
-        nice_y_values = dict(zip(cpu_util.keys(),
-                                 [[] for i in xrange(len(cpu_util))]))
-        sys_y_values = dict(zip(cpu_util.keys(),
-                                [[] for i in xrange(len(cpu_util))]))
-        iowait_y_values = dict(zip(cpu_util.keys(),
-                                   [[] for i in xrange(len(cpu_util))]))
-        irq_y_values = dict(zip(cpu_util.keys(),
-                                [[] for i in xrange(len(cpu_util))]))
-        soft_y_values = dict(zip(cpu_util.keys(),
-                                 [[] for i in xrange(len(cpu_util))]))
-        steal_y_values = dict(zip(cpu_util.keys(),
-                                  [[] for i in xrange(len(cpu_util))]))
-        guest_y_values = dict(zip(cpu_util.keys(),
-                                  [[] for i in xrange(len(cpu_util))]))
-        gnice_y_values = dict(zip(cpu_util.keys(),
-                                  [[] for i in xrange(len(cpu_util))]))
-        idle_y_values = dict(zip(cpu_util.keys(),
-                                 [[] for i in xrange(len(cpu_util))]))
+        usr_y_values = dict(list(zip(list(cpu_util.keys()),
+                                [[] for i in range(len(cpu_util))])))
+        nice_y_values = dict(list(zip(list(cpu_util.keys()),
+                                 [[] for i in range(len(cpu_util))])))
+        sys_y_values = dict(list(zip(list(cpu_util.keys()),
+                                [[] for i in range(len(cpu_util))])))
+        iowait_y_values = dict(list(zip(list(cpu_util.keys()),
+                                   [[] for i in range(len(cpu_util))])))
+        irq_y_values = dict(list(zip(list(cpu_util.keys()),
+                                [[] for i in range(len(cpu_util))])))
+        soft_y_values = dict(list(zip(list(cpu_util.keys()),
+                                 [[] for i in range(len(cpu_util))])))
+        steal_y_values = dict(list(zip(list(cpu_util.keys()),
+                                  [[] for i in range(len(cpu_util))])))
+        guest_y_values = dict(list(zip(list(cpu_util.keys()),
+                                  [[] for i in range(len(cpu_util))])))
+        gnice_y_values = dict(list(zip(list(cpu_util.keys()),
+                                  [[] for i in range(len(cpu_util))])))
+        idle_y_values = dict(list(zip(list(cpu_util.keys()),
+                                 [[] for i in range(len(cpu_util))])))
 
         y_cpu_values = [usr_y_values, nice_y_values, sys_y_values,
                         iowait_y_values, irq_y_values, soft_y_values,
@@ -2166,7 +2174,7 @@ def create_multiple_graph(x, y, x_label, y_label,
                         '#98df8a', '#d62728', '#ff9896', '#9467bd', '#c5b0d5']
 
         for i in range(0, len(x)):
-            for key in cpu_util.keys():
+            for key in list(cpu_util.keys()):
                 for j, y_cpu_value in enumerate(y_cpu_values):
                     y_cpu_value[key].append(cpu_util[key][i][y_cpu_keys[j]])
 
@@ -2175,7 +2183,7 @@ def create_multiple_graph(x, y, x_label, y_label,
         else:
             align = 'edge'
 
-        for i, key in enumerate(natsorted(cpu_util.keys())):
+        for i, key in enumerate(natsorted(list(cpu_util.keys()))):
             x_pos = (x_cpu - (len(cpu_util) / 2 * bar_width)) + (i * bar_width)
 
             bottom = [0] * len(x)
@@ -2240,7 +2248,7 @@ def get_physical_port_speed():
 
     result = dut_shell.dut_exec("ethtool {}".format(config.physical_interface))
 
-    m = re.search('\s*Speed: ([0-9]*)Mb.*', result.output)
+    m = re.search('\s*Speed: ([0-9]*)Mb.*', result.output.decode("utf-8", "ignore"))
     if m:
         speed = int(m.group(1)) * 1000000
     else:
@@ -2367,7 +2375,7 @@ def check_pci_address_string(pci_address):
 # is enabled else we end up with the same text on the console twice.
 #
 def lprint(msg):
-    print msg
+    print(msg)
     if config.logging is not None:
         slogger.info(msg)
 
@@ -2438,12 +2446,12 @@ def get_cpu_monitoring_stats():
     #                    Average:   0        -   6982     0.00       0.05       0.00        0.05     -  |__ovs-vswitchd
     regex = re.compile("^Average:\s+[0-9]+\s+-\s+[0-9]+\s+[0-9\.]+\s+[0-9\.]+\s+[0-9\.]+\s+([0-9\.]+).+", re.MULTILINE)
     ovs_cpu_usage = float(0)
-    for match in regex.finditer(results.stdout_output):
+    for match in regex.finditer(results.stdout_output.decode("utf-8", "ignore")):
         ovs_cpu_usage += float(match.group(1))
 
     cmd = r"cat /var/tmp/cpu_mpstat.txt"
     results = dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd], die_on_error=True)
-    cpu_raw_stats = results.stdout_output
+    cpu_raw_stats = results.stdout_output.decode("utf-8", "ignore")
 
     cpu_usr = float(0)
     cpu_nice = float(0)
@@ -2458,7 +2466,8 @@ def get_cpu_monitoring_stats():
     #  %usr   %nice    %sys %iowait    %irq   %soft  %steal  %guest  %gnice   %idle
     regex = re.compile("^Average:\s+[0-9]+\s+([0-9\.]+)\s+([0-9\.]+)\s+([0-9\.]+)\s+([0-9\.]+)\s+([0-9\.]+)\s+([0-9\.]+)\s+([0-9\.]+)\s+([0-9\.]+)\s+([0-9\.]+)\s+([0-9\.]+)$",
                        re.MULTILINE)
-    for match in regex.finditer(results.stdout_output):
+
+    for match in regex.finditer(results.stdout_output.decode('utf-8')):
         cpu_usr += float(match.group(1))
         cpu_nice += float(match.group(2))
         cpu_sys += float(match.group(3))
@@ -2500,7 +2509,7 @@ def get_ovs_version():
                                 die_on_error=True)
 
     m = re.search('.*([0-9]+.[0-9]+.[0-9]+).*',
-                  result.output)
+                  result.output.decode("utf-8", "ignore"))
     if m:
         return m.group(1)
 
@@ -2514,9 +2523,9 @@ def get_ovs_version():
 def get_ovs_datapath():
     result = dut_shell.dut_exec('sh -c "ovs-appctl dpif/show"',
                                 die_on_error=True)
-    output = result.output.replace("\n", "")
+    output = result.output.replace(b"\n",b"")
     m = re.search('(.+@.*{}):.*'.format(config.bridge_name),
-                  output)
+                  output.decode("utf-8", "ignore"))
     if m:
         m = re.search('(.+)@.*'.format(config.bridge_name),
                       m.group(1))
@@ -2535,7 +2544,7 @@ def get_of_bridge_mac_address(bridge):
     result = dut_shell.dut_exec(command, die_on_error=True)
 
     m = re.search('\s*LOCAL\({0}\): addr:(.*)'.format(bridge),
-                  result.output)
+                  result.output.decode("utf-8", "ignore"))
     if not m:
         lprint("ERROR: Can't figure out MAC address for bridge \"{}\"".
                format(bridge))
@@ -2553,22 +2562,22 @@ flow_types = ['L2', 'L3', 'L4-UDP']
 
 
 def get_flow_type_short():
-    labels = dict(zip(flow_types,
-                      ['L2', 'L3', 'L4-UDP']))
+    labels = dict(list(zip(flow_types,
+                      ['L2', 'L3', 'L4-UDP'])))
     return labels[config.flow_type]
 
 
 def get_flow_type_name():
-    labels = dict(zip(flow_types,
-                      ['l2', 'l3', 'l4_udp']))
+    labels = dict(list(zip(flow_types,
+                      ['l2', 'l3', 'l4_udp'])))
     return labels[config.flow_type]
 
 
 def get_traffic_generator_flow():
-    flow_type = dict(zip(flow_types,
+    flow_type = dict(list(zip(flow_types,
                          [TrafficFlowType.l2_mac,
                           TrafficFlowType.l3_ipv4,
-                          TrafficFlowType.l4_udp]))
+                          TrafficFlowType.l4_udp])))
     return flow_type[config.flow_type]
 
 
@@ -2579,9 +2588,9 @@ traffic_tester_types = ['xena', 'trex']
 
 
 def get_traffic_generator_type():
-    traffic_generator_type = dict(zip(traffic_tester_types,
+    traffic_generator_type = dict(list(zip(traffic_tester_types,
                                       [TrafficGeneratorType.xena,
-                                       TrafficGeneratorType.trex]))
+                                       TrafficGeneratorType.trex])))
 
     return traffic_generator_type[config.tester_type]
 
@@ -3090,12 +3099,13 @@ def main():
     else:
         raise ValueError("No support for this protocol!!")
 
-    with open(csv_file, 'wb') as csvfile:
+    with open(csv_file, 'w') as csvfile:
         csv_handle = csv.writer(csvfile, dialect='excel')
 
-        csv_handle.writerow(["Physical port, \"{}\", speed {} Gbit/s".
-                             format(config.physical_interface,
-                                    phy_speed / 1000000000)])
+        csv_handle.writerow(["Physical port"] +
+                            [str(config.physical_interface)] +
+                            ["speed {} Gbit/s".
+                             format(phy_speed / 1000000000)])
         csv_handle.writerow([])
         csv_handle.writerow([])
 
