@@ -905,6 +905,8 @@ def start_traffic_rx_on_vm(vm, pci):
 
     cpu_mask = ((1 << (config.dut_vm_nic_queues + 1)) - 1)
     pmd_cpu_mask = cpu_mask & ~0x1
+    disable_hw_vlan = " --disable-hw-vlan" if vm_dpdk_version < \
+                      StrictVersion('18.2.0') else ""
 
     cmd = r"sshpass -p {2} ssh -o UserKnownHostsFile=/dev/null " \
           r"-o StrictHostKeyChecking=no -n {1}@{0} " \
@@ -912,12 +914,13 @@ def start_traffic_rx_on_vm(vm, pci):
           r" nohup sh -c " \
           r' "(while sleep 1; do echo show port stats 0; done | ' \
           r" testpmd -c {5:x} -n 4 --socket-mem 2048,0 -w {3} -- "\
-          r" --burst 64 --disable-hw-vlan -i --rxq={4} --txq={4} --rxd=4096 " \
+          r" --burst 64 -i --rxq={4} --txq={4} --rxd=4096 " \
           r" --txd=1024 --auto-start --forward-mode=rxonly " \
-          r' --port-topology=chained --coremask={6:x})" ' \
+          r' --port-topology=chained --coremask={6:x}{7})" ' \
           r" &>results.txt &'". \
           format(vm, config.dut_vm_user, config.dut_vm_password, pci,
-                 config.dut_vm_nic_queues, cpu_mask, pmd_cpu_mask)
+                 config.dut_vm_nic_queues, cpu_mask, pmd_cpu_mask,
+                 disable_hw_vlan)
 
     dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd], die_on_error=True)
     time.sleep(2)
@@ -944,6 +947,8 @@ def start_traffic_loop_on_vm(vm, pci):
     cpu_mask = ((1 << (config.dut_vm_nic_queues + 1)) - 1)
     pmd_cpu_mask = cpu_mask & ~0x1
     mac_swap = " --forward-mode=macswap" if config.mac_swap else ""
+    disable_hw_vlan = " --disable-hw-vlan" if vm_dpdk_version < \
+                      StrictVersion('18.2.0') else ""
 
     cmd = r"sshpass -p {2} ssh -o UserKnownHostsFile=/dev/null " \
           r"-o StrictHostKeyChecking=no -n {1}@{0} " \
@@ -951,13 +956,13 @@ def start_traffic_loop_on_vm(vm, pci):
           r" nohup sh -c " \
           r' "(while sleep 1; do echo show port stats 0; done | ' \
           r" testpmd -c {5:x} -n 4 --socket-mem 2048,0 -w {3} -- "\
-          r" --burst 64 --disable-hw-vlan -i --rxq={4} --txq={4} --rxd=4096 " \
+          r" --burst 64 -i --rxq={4} --txq={4} --rxd=4096 " \
           r" --txd=1024 --coremask={6:x} --auto-start " \
-          r' --port-topology=chained{7})" ' \
+          r' --port-topology=chained{7}{8})" ' \
           r" &>results.txt &'". \
           format(vm, config.dut_vm_user, config.dut_vm_password, pci,
                  config.dut_vm_nic_queues, cpu_mask, pmd_cpu_mask,
-                 mac_swap)
+                 mac_swap, disable_hw_vlan)
 
     dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd], die_on_error=True)
     time.sleep(2)
@@ -2509,6 +2514,28 @@ def get_ovs_version():
 
 
 #
+# Get VM DPDK version
+#
+def get_vm_dpdk_version(vm):
+
+    cmd = r"sshpass -p {2} ssh -o UserKnownHostsFile=/dev/null " \
+          r"-o StrictHostKeyChecking=no -n {1}@{0} " \
+          r"'testpmd -v | grep \"EAL: RTE Version\"'". \
+          format(vm, config.dut_vm_user, config.dut_vm_password)
+
+    result = dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd],
+                                die_on_error=False)
+
+    m = re.search('.*DPDK ([0-9]+\.[0-9]+\.[0-9]+).*',
+                  result.output)
+    if m:
+        return m.group(1)
+
+    lprint("ERROR: Can't figure out VMs DPDK version!")
+    sys.exit(-1)
+
+
+#
 # Get ovs data path type
 #
 def get_ovs_datapath():
@@ -2604,6 +2631,7 @@ def main():
     global tester
     global phy_speed
     global ovs_version
+    global vm_dpdk_version
     global run_start_time
 
     run_start_time = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
@@ -3034,8 +3062,11 @@ def main():
     #
     lprint("- Stop any running test tools...")
     stop_cpu_monitoring(die=False)
-    stop_traffic_rx_on_vm(config.dut_vm_address, die=False)
-    stop_traffic_tx_on_vm(config.dut_vm_address, die=False)
+    if config.dut_vm_address != '':
+        stop_traffic_rx_on_vm(config.dut_vm_address, die=False)
+        stop_traffic_tx_on_vm(config.dut_vm_address, die=False)
+        lprint("- Getting VM's DPDK version...")
+        vm_dpdk_version = get_vm_dpdk_version(config.dut_vm_address)
     if config.dut_second_vm_address != '':
         stop_traffic_rx_on_vm(config.dut_second_vm_address, die=False)
         stop_traffic_tx_on_vm(config.dut_second_vm_address, die=False)
