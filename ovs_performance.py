@@ -2527,9 +2527,9 @@ def get_vm_dpdk_version(vm):
                                 die_on_error=False)
 
     m = re.search('.*DPDK ([0-9]+\.[0-9]+\.[0-9]+).*',
-                  result.output)
+                  result.output.decode("ascii", "ignore"))
     if m:
-        return m.group(1)
+        return str(m.group(1))
 
     lprint("ERROR: Can't figure out VMs DPDK version!")
     sys.exit(-1)
