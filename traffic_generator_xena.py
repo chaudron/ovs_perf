@@ -107,7 +107,7 @@ class _XenaNetworksPort(TrafficGeneratorPort):
 
     def _delete_traffic_stream_config(self):
         self.__traffic_flows = TrafficFlowType.none
-        for stream in self.__streams.keys():
+        for stream in list(self.__streams.keys()):
             self.__xport.del_stream(stream)
 
         self.__streams = dict()
@@ -345,10 +345,10 @@ class _XenaNetworksPort(TrafficGeneratorPort):
                 for alternate_flow_sets in range(0, 3):
                     flows_to_do = alternate_flows
                     stream_id_start = len(self.__streams) + 1
-                    self.__alternate_stream_sets.append(range(stream_id_start,
+                    self.__alternate_stream_sets.append(list(range(stream_id_start,
                                                               stream_id_start +
                                                               self._div_round_up(alternate_flows,
-                                                                                 0x10000)))
+                                                                                 0x10000))))
                     if alternate_flow_sets == 0:
                         suppress = False
                     else:
@@ -468,7 +468,7 @@ class XenaNetworks(TrafficGeneratorChassis):
                 #
                 # Re-add previously configured ports
                 #
-                for port in self.port_data.keys():
+                for port in list(self.port_data.keys()):
                     self.port_data[port] = self._reserve_port(port)
 
         return self.is_connected()
