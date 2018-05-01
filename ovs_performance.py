@@ -914,13 +914,14 @@ def start_traffic_rx_on_vm(vm, pci):
           r" nohup sh -c " \
           r' "(while sleep 1; do echo show port stats 0; done | ' \
           r" testpmd -c {5:x} -n 4 --socket-mem 2048,0 -w {3} -- "\
-          r" --burst 64 -i --rxq={4} --txq={4} --rxd=4096 " \
-          r" --txd=1024 --auto-start --forward-mode=rxonly " \
+          r" --burst 64 -i --rxq={4} --txq={4} --rxd={8} " \
+          r" --txd={9} --auto-start --forward-mode=rxonly " \
           r' --port-topology=chained --coremask={6:x}{7})" ' \
           r" &>results.txt &'". \
           format(vm, config.dut_vm_user, config.dut_vm_password, pci,
                  config.dut_vm_nic_queues, cpu_mask, pmd_cpu_mask,
-                 disable_hw_vlan)
+                 disable_hw_vlan, config.dut_vm_nic_rxd,
+                 config.dut_vm_nic_txd)
 
     dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd], die_on_error=True)
     time.sleep(2)
@@ -956,13 +957,14 @@ def start_traffic_loop_on_vm(vm, pci):
           r" nohup sh -c " \
           r' "(while sleep 1; do echo show port stats 0; done | ' \
           r" testpmd -c {5:x} -n 4 --socket-mem 2048,0 -w {3} -- "\
-          r" --burst 64 -i --rxq={4} --txq={4} --rxd=4096 " \
-          r" --txd=1024 --coremask={6:x} --auto-start " \
+          r" --burst 64 -i --rxq={4} --txq={4} --rxd={9} " \
+          r" --txd={10} --coremask={6:x} --auto-start " \
           r' --port-topology=chained{7}{8})" ' \
           r" &>results.txt &'". \
           format(vm, config.dut_vm_user, config.dut_vm_password, pci,
                  config.dut_vm_nic_queues, cpu_mask, pmd_cpu_mask,
-                 mac_swap, disable_hw_vlan)
+                 mac_swap, disable_hw_vlan, config.dut_vm_nic_rxd,
+                 config.dut_vm_nic_txd)
 
     dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd], die_on_error=True)
     time.sleep(2)
@@ -2688,6 +2690,12 @@ def main():
     parser.add_argument("--dut-vm-nic-queues", metavar="QUEUES",
                         help="Number of VM nic queues (and cores) to allocate, default 1",
                         type=int, default=1)
+    parser.add_argument("--dut-vm-nic-rxd", metavar="DESCRIPTORS",
+                        help="Number of VM nic receive descriptors, default 4096",
+                        type=int, default=4096)
+    parser.add_argument("--dut-vm-nic-txd", metavar="DESCRIPTORS",
+                        help="Number of VM nic transmit descriptors, default 1024",
+                        type=int, default=1024)
     # Removed VV test for now, as it needs non-upstream trafgen tool
     #parser.add_argument("--dut-second-vm-address", metavar="ADDRESS",
     #                    help="IP address of second VM running on OpenVSwitch DUT", type=str,
@@ -2987,6 +2995,8 @@ def main():
     slogger.debug("  %-23.23s: %s", 'OVS DUT VM2 PCI Address', config.dut_second_vm_nic_pci)
     slogger.debug("  %-23.23s: %s", 'OVS VM Login', config.dut_vm_user)
     slogger.debug("  %-23.23s: %s", 'OVS VM NIC queues', config.dut_vm_nic_queues)
+    slogger.debug("  %-23.23s: %s", 'OVS VM NIC rxd', config.dut_vm_nic_rxd)
+    slogger.debug("  %-23.23s: %s", 'OVS VM NIC txd', config.dut_vm_nic_txd)
     slogger.debug("  %-23.23s: %s", 'Physical Interface', config.physical_interface)
     slogger.debug("  %-23.23s: %u Gbit/s", 'Physical Int. Speed', config.physical_speed)
     slogger.debug("  %-23.23s: %s", 'Virtual Interface', config.virtual_interface)
