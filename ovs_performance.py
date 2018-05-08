@@ -88,6 +88,7 @@ from traffic_generator import TrafficGenerator, TrafficGeneratorType
 #
 import matplotlib
 matplotlib.use('Agg')
+
 #
 # Imports from natural sort
 #
@@ -97,6 +98,15 @@ from natsort import natsorted
 # Imports from distutils
 #
 from distutils.version import StrictVersion
+
+# In Python 2, raw_input() returns a string, and input() tries
+# to run the input as a Python expression.
+# Since getting a string was almost always what we wanted,
+# Python 3 does that with input()
+# The following line checks the Python version being used to
+# stick to raw_input() for Python2 and input() for Python3
+if sys.version_info[0] == 3:
+    raw_input = input
 
 
 #
@@ -393,6 +403,7 @@ def test_p2v2p(nr_of_flows, packet_sizes):
                         cpu_utilization=cpu_results)
 
     return p2v2p_results, cpu_results
+
 
 #
 # Run simple traffic test Physical to VM
@@ -994,7 +1005,7 @@ def get_traffic_rx_stats_from_vm(vm, **kwargs):
 
     if skip_samples > 0:
         pkt_rates = pkt_rates[skip_samples:]
-        
+
     if len(pkt_rates) <= 10:
         lprint("ERROR: No engough elements to calculate packet rate!")
         sys.exit(-1)
@@ -1087,7 +1098,7 @@ def get_traffic_tx_stats_from_vm(vm):
 #
 def get_packets_per_second_from_traffic_generator_rx_stats(rx_stats):
     avg = cnt = 0
-    for timestamp in natsorted(rx_stats.keys())[2:-2]:
+    for timestamp in natsorted(list(rx_stats.keys()))[2:-2]:
         stats = rx_stats[timestamp]
         pps = stats['pr_total']['pps']
         avg += pps
@@ -1101,7 +1112,7 @@ def get_packets_per_second_from_traffic_generator_rx_stats(rx_stats):
 #
 def get_packets_per_second_from_traffic_generator_tx_stats(tx_stats):
     avg = cnt = 0
-    for timestamp in natsorted(tx_stats.keys())[2:-2]:
+    for timestamp in natsorted(list(tx_stats.keys()))[2:-2]:
         stats = tx_stats[timestamp]
         pps = stats['pt_total']['pps']
         avg += pps
@@ -1350,6 +1361,7 @@ def create_ovs_l3_of_rules(number_of_flows, src_port, dst_port, **kwargs):
                    format(number_of_flows, int(result.stdout_output)))
             sys.exit(-1)
 
+
 #
 # Add OVS Bidirectional L3 OpenFlow rules
 #
@@ -1483,6 +1495,7 @@ def create_ovs_l4_of_rules(number_of_flows, src_port, dst_port, **kwargs):
             lprint("ERROR: Only {0} flows should exsits, but there are {1}!".
                    format(number_of_flows, int(result.stdout_output)))
             sys.exit(-1)
+
 
 #
 # Add OVS Bidirectional L4 OpenFlow rules
@@ -1619,7 +1632,6 @@ def create_ovs_bridge():
                        format(config.second_physical_interface,
                               config.second_physical_interface_pci)
 
-
     #
     # Configure all the above!
     #
@@ -1633,7 +1645,7 @@ def create_ovs_bridge():
     # working. So we pause here, asking for restart of the VM.
     #
     if dpdk and config.virtual_interface:
-        print "!!! Finished configuring the OVS bridge, please restart the Virtual Machine !!!"
+        print("!!! Finished configuring the OVS bridge, please restart the Virtual Machine !!!")
         raw_input("Press Enter to continue...")
 
 
@@ -1723,7 +1735,7 @@ def create_ovs_vxlan_bridge():
     # working. So we pause here, asking for restart of the VM.
     #
     if dpdk:
-        print "!!! Finished configuring the OVS bridge, please restart the Virtual Machine !!!"
+        print("!!! Finished configuring the OVS bridge, please restart the Virtual Machine !!!")
         raw_input("Press Enter to continue...")
 
 
@@ -1807,9 +1819,9 @@ def get_of_port_packet_stats(of_port, **kwargs):
                   port_stats.output)
     if m:
         if '?' in m.group(1):
-            tx = 0
+            tx = int(0)
         else:
-            tx = m.group(1)
+            tx = int(m.group(1))
     else:
         lprint("ERROR: Can't get transmitted packet stats for OpenFlow "
                "port {0} on brige \"{1}\"".
@@ -1820,9 +1832,9 @@ def get_of_port_packet_stats(of_port, **kwargs):
                   port_stats.output)
     if m:
         if '?' in m.group(1):
-            tx_drop = 0
+            tx_drop = int(0)
         else:
-            tx_drop = m.group(1)
+            tx_drop = int(m.group(1))
     else:
         lprint("ERROR: Can't get transmitted drop stats for OpenFlow "
                "port {0} on brige \"{1}\"".
@@ -1833,9 +1845,9 @@ def get_of_port_packet_stats(of_port, **kwargs):
                   port_stats.output)
     if m:
         if '?' in m.group(1):
-            rx = 0
+            rx = int(0)
         else:
-            rx = m.group(1)
+            rx = int(m.group(1))
     else:
         lprint("ERROR: Can't get received packet stats for OpenFlow "
                "port {0} on brige \"{1}\"".
@@ -1846,25 +1858,25 @@ def get_of_port_packet_stats(of_port, **kwargs):
                   port_stats.output)
     if m:
         if '?' in m.group(1):
-            rx_drop = 0
+            rx_drop = int(0)
         else:
-            rx_drop = m.group(1)
+            rx_drop = int(m.group(1))
     else:
         lprint("ERROR: Can't get received drop stats for OpenFlow port {0} on brige \"{1}\""
                .format(of_port, config.bridge_name))
         sys.exit(-1)
 
     slogger.debug("OF port {0} stats: tx = {1}, tx_drop = {2}, rx = {3}, tx_drop = {3}".
-                  format(of_port, long(tx), long(tx_drop), long(rx), long(rx_drop)))
+                  format(of_port, tx, tx_drop, rx, rx_drop))
 
-    return long(tx), long(tx_drop), long(rx), long(rx_drop)
+    return tx, tx_drop, rx, rx_drop
 
 
 #
 # Convert a MAC address string to an integer
 #
 def mac_2_int(mac_str):
-    return int(mac_str.translate(None, ":"), 16)
+    return int(mac_str.replace(":", ""), 16)
 
 
 #
@@ -2056,7 +2068,6 @@ def create_multiple_graph(x, y, x_label, y_label,
     slogger.info("create_multiple_graph[{}], x = {} : y = {}".
                  format(title, x, y))
 
-
     if cpu_util is None:
         fig, pps = plt.subplots()
         pps_plot = pps
@@ -2091,7 +2102,7 @@ def create_multiple_graph(x, y, x_label, y_label,
     pps_plot.grid(b=True, which='minor', color='k', linestyle=':', alpha=0.2)
     pps_plot.minorticks_on()
 
-    for y_run in natsorted(y.keys()):
+    for y_run in natsorted(list(y.keys())):
         pps_plot.plot(x, y[y_run], 'o-', label="{}".format(y_run))
 
     #
@@ -2122,11 +2133,11 @@ def create_multiple_graph(x, y, x_label, y_label,
         bar_width = 0.11
         cpu_plot.set_title("Open vSwitch CPU utilization")
 
-        ovs_y_values = dict(zip(cpu_util.keys(),
-                                [[] for i in xrange(len(cpu_util))]))
+        ovs_y_values = dict(list(zip(list(cpu_util.keys()),
+                                     [[] for i in range(len(cpu_util))])))
 
         for i in range(0, len(x)):
-            for key in cpu_util.keys():
+            for key in list(cpu_util.keys()):
                 ovs_y_values[key].append(cpu_util[key][i]['ovs_cpu'])
 
         if len(cpu_util) % 2 != 0:
@@ -2134,7 +2145,7 @@ def create_multiple_graph(x, y, x_label, y_label,
         else:
             align = 'edge'
 
-        for i, key in enumerate(natsorted(cpu_util.keys())):
+        for i, key in enumerate(natsorted(list(cpu_util.keys()))):
             colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
             x_pos = (x_cpu - (len(cpu_util) / 2 * bar_width)) + (i * bar_width)
             cpu_plot.bar(x_pos, ovs_y_values[key], bar_width, align=align,
@@ -2155,26 +2166,26 @@ def create_multiple_graph(x, y, x_label, y_label,
         #
         sys_plot.set_title("Total System CPU utilization")
 
-        usr_y_values = dict(zip(cpu_util.keys(),
-                                [[] for i in xrange(len(cpu_util))]))
-        nice_y_values = dict(zip(cpu_util.keys(),
-                                 [[] for i in xrange(len(cpu_util))]))
-        sys_y_values = dict(zip(cpu_util.keys(),
-                                [[] for i in xrange(len(cpu_util))]))
-        iowait_y_values = dict(zip(cpu_util.keys(),
-                                   [[] for i in xrange(len(cpu_util))]))
-        irq_y_values = dict(zip(cpu_util.keys(),
-                                [[] for i in xrange(len(cpu_util))]))
-        soft_y_values = dict(zip(cpu_util.keys(),
-                                 [[] for i in xrange(len(cpu_util))]))
-        steal_y_values = dict(zip(cpu_util.keys(),
-                                  [[] for i in xrange(len(cpu_util))]))
-        guest_y_values = dict(zip(cpu_util.keys(),
-                                  [[] for i in xrange(len(cpu_util))]))
-        gnice_y_values = dict(zip(cpu_util.keys(),
-                                  [[] for i in xrange(len(cpu_util))]))
-        idle_y_values = dict(zip(cpu_util.keys(),
-                                 [[] for i in xrange(len(cpu_util))]))
+        usr_y_values = dict(list(zip(list(cpu_util.keys()),
+                                     [[] for i in range(len(cpu_util))])))
+        nice_y_values = dict(list(zip(list(cpu_util.keys()),
+                                      [[] for i in range(len(cpu_util))])))
+        sys_y_values = dict(list(zip(list(cpu_util.keys()),
+                                     [[] for i in range(len(cpu_util))])))
+        iowait_y_values = dict(list(zip(list(cpu_util.keys()),
+                                        [[] for i in range(len(cpu_util))])))
+        irq_y_values = dict(list(zip(list(cpu_util.keys()),
+                                     [[] for i in range(len(cpu_util))])))
+        soft_y_values = dict(list(zip(list(cpu_util.keys()),
+                                      [[] for i in range(len(cpu_util))])))
+        steal_y_values = dict(list(zip(list(cpu_util.keys()),
+                                       [[] for i in range(len(cpu_util))])))
+        guest_y_values = dict(list(zip(list(cpu_util.keys()),
+                                       [[] for i in range(len(cpu_util))])))
+        gnice_y_values = dict(list(zip(list(cpu_util.keys()),
+                                       [[] for i in range(len(cpu_util))])))
+        idle_y_values = dict(list(zip(list(cpu_util.keys()),
+                                      [[] for i in range(len(cpu_util))])))
 
         y_cpu_values = [usr_y_values, nice_y_values, sys_y_values,
                         iowait_y_values, irq_y_values, soft_y_values,
@@ -2188,7 +2199,7 @@ def create_multiple_graph(x, y, x_label, y_label,
                         '#98df8a', '#d62728', '#ff9896', '#9467bd', '#c5b0d5']
 
         for i in range(0, len(x)):
-            for key in cpu_util.keys():
+            for key in list(cpu_util.keys()):
                 for j, y_cpu_value in enumerate(y_cpu_values):
                     y_cpu_value[key].append(cpu_util[key][i][y_cpu_keys[j]])
 
@@ -2197,7 +2208,7 @@ def create_multiple_graph(x, y, x_label, y_label,
         else:
             align = 'edge'
 
-        for i, key in enumerate(natsorted(cpu_util.keys())):
+        for i, key in enumerate(natsorted(list(cpu_util.keys()))):
             x_pos = (x_cpu - (len(cpu_util) / 2 * bar_width)) + (i * bar_width)
 
             bottom = [0] * len(x)
@@ -2295,6 +2306,7 @@ def eth_utilization(line_speed_bps, packet_size, packets_per_second):
 
     return util
 
+
 #
 # Calculate max packets per second base on packet size and wire speed
 #
@@ -2389,9 +2401,10 @@ def check_pci_address_string(pci_address):
 # is enabled else we end up with the same text on the console twice.
 #
 def lprint(msg):
-    print msg
+    print (msg)
     if config.logging is not None:
         slogger.info(msg)
+
 
 #
 # Start Perf recording on DUT
@@ -2522,9 +2535,9 @@ def get_ovs_version():
                                 die_on_error=True)
 
     m = re.search('.*([0-9]+.[0-9]+.[0-9]+).*',
-                  result.output)
+                  str(result.output))
     if m:
-        return m.group(1)
+        return str(m.group(1))
 
     lprint("ERROR: Can't figure out ovs-vswitchd's version!")
     sys.exit(-1)
@@ -2544,7 +2557,7 @@ def get_vm_dpdk_version(vm):
                                 die_on_error=False)
 
     m = re.search('.*DPDK ([0-9]+\.[0-9]+\.[0-9]+).*',
-                  result.output.decode("ascii", "ignore"))
+                  result.output)
     if m:
         return str(m.group(1))
 
@@ -2597,22 +2610,22 @@ flow_types = ['L2', 'L3', 'L4-UDP']
 
 
 def get_flow_type_short():
-    labels = dict(zip(flow_types,
-                      ['L2', 'L3', 'L4-UDP']))
+    labels = dict(list(zip(flow_types,
+                           ['L2', 'L3', 'L4-UDP'])))
     return labels[config.flow_type]
 
 
 def get_flow_type_name():
-    labels = dict(zip(flow_types,
-                      ['l2', 'l3', 'l4_udp']))
+    labels = dict(list(zip(flow_types,
+                           ['l2', 'l3', 'l4_udp'])))
     return labels[config.flow_type]
 
 
 def get_traffic_generator_flow():
-    flow_type = dict(zip(flow_types,
-                         [TrafficFlowType.l2_mac,
-                          TrafficFlowType.l3_ipv4,
-                          TrafficFlowType.l4_udp]))
+    flow_type = dict(list(zip(flow_types,
+                              [TrafficFlowType.l2_mac,
+                               TrafficFlowType.l3_ipv4,
+                               TrafficFlowType.l4_udp])))
     return flow_type[config.flow_type]
 
 
@@ -2623,9 +2636,9 @@ traffic_tester_types = ['xena', 'trex']
 
 
 def get_traffic_generator_type():
-    traffic_generator_type = dict(zip(traffic_tester_types,
-                                      [TrafficGeneratorType.xena,
-                                       TrafficGeneratorType.trex]))
+    traffic_generator_type = dict(list(zip(traffic_tester_types,
+                                           [TrafficGeneratorType.xena,
+                                            TrafficGeneratorType.trex])))
 
     return traffic_generator_type[config.tester_type]
 
@@ -2834,12 +2847,12 @@ def main():
         sys.exit(-1)
 
     if config.flow_type == 'L2':
-        if (int(config.src_mac_address.translate(None, ":"), 16) & 0xffffff) \
+        if (int(config.src_mac_address.replace(":", ""), 16) & 0xffffff) \
            != 0:
             lprint("ERROR: For L2 tests the Source Base MAC address must "
                    "be xx:xx:xx:00:00:00")
             sys.exit(-1)
-        if (int(config.dst_mac_address.translate(None, ":"), 16) & 0xffffff) \
+        if (int(config.dst_mac_address.replace(":", ""), 16) & 0xffffff) \
            != 0:
             lprint("ERROR: For L2 tests the Destination Base MAC address must "
                    "be xx:xx:xx:00:00:00")
@@ -3138,7 +3151,7 @@ def main():
     else:
         raise ValueError("No support for this protocol!!")
 
-    with open(csv_file, 'wb') as csvfile:
+    with open(csv_file, 'w') as csvfile:
         csv_handle = csv.writer(csvfile, dialect='excel')
 
         csv_handle.writerow(["Physical port, \"{}\", speed {} Gbit/s".
