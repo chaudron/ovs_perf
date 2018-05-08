@@ -33,6 +33,11 @@
 #
 import logging
 
+#
+# Import for Hexadecimal representation of binary data
+# in Python2 and Python3
+#
+import binascii
 
 #
 # External traffic generators
@@ -53,6 +58,7 @@ from xenalib.XenaManager import XenaManager
 # Imports from Scapy
 #
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
+
 #
 # Remove VXLAN for now, as Scapy needed for T-Rex has no VXLAN support.
 #
@@ -81,7 +87,7 @@ class _XenaNetworksPort(TrafficGeneratorPort):
         return ":".join(mac_hex[i:i+2] for i in range(0, len(mac_hex), 2))
 
     def _mac_2_int(self, mac_str):
-        return int(mac_str.translate(None, ":"), 16)
+        return int(mac_str.replace(":", ""), 16)
 
     def clear_statistics(self):
         self.__xport.clear_all_rx_stats()
@@ -107,7 +113,7 @@ class _XenaNetworksPort(TrafficGeneratorPort):
 
     def _delete_traffic_stream_config(self):
         self.__traffic_flows = TrafficFlowType.none
-        for stream in self.__streams.keys():
+        for stream in list(self.__streams.keys()):
             self.__xport.del_stream(stream)
 
         self.__streams = dict()
@@ -159,12 +165,15 @@ class _XenaNetworksPort(TrafficGeneratorPort):
         else:
             raise ValueError("Unsupported traffic type for Xena tester!!!")
 
-        if (len(str(L2/L3/L4)) + 4) > packet_size:  # +4 for Ethernet CRC
-            raise ValueError("Packet size ({} bytes) to small for requested "
+        if (len(L2/L3/L4) + 4) > packet_size:  # +4 for Ethernet CRC
+            raise ValueError("Packet size ({} bytes) too small for requested "
                              "packet ({} bytes)!".
                              format(packet_size, len(L2/L3/L4) + 4))
-
-        packet_hex = '0x' + str(L2/L3/L4).encode('hex')
+        #
+        # The hex codec has been discarded in Python 3.x.
+        # Use binascii instead(it is Python2 and Python3 compatible):
+        #
+        packet_hex = '0x' + binascii.hexlify(bytes(L2/L3/L4)).decode('ascii')
 
         new_stream = self.__xport.add_stream(stream_id)
         if new_stream is None:
@@ -315,7 +324,11 @@ class _XenaNetworksPort(TrafficGeneratorPort):
             #
 
             flows_to_do = nr_of_flows
-            for stream in range(1, self._div_round_up(nr_of_flows, 0x10000) + 1):
+            #
+            # Explicit typecast to int to avoid the following error:
+            # TypeError: 'float' object cannot be interpreted as an integer
+            #
+            for stream in range(1, int(self._div_round_up(nr_of_flows, 0x10000)) + 1):
                 if flows_to_do > 0x10000:
                     flows_this_run = 0x10000
                 else:
@@ -345,10 +358,10 @@ class _XenaNetworksPort(TrafficGeneratorPort):
                 for alternate_flow_sets in range(0, 3):
                     flows_to_do = alternate_flows
                     stream_id_start = len(self.__streams) + 1
-                    self.__alternate_stream_sets.append(range(stream_id_start,
+                    self.__alternate_stream_sets.append(list(range(stream_id_start,
                                                               stream_id_start +
                                                               self._div_round_up(alternate_flows,
-                                                                                 0x10000)))
+                                                                                 0x10000))))
                     if alternate_flow_sets == 0:
                         suppress = False
                     else:
@@ -468,7 +481,7 @@ class XenaNetworks(TrafficGeneratorChassis):
                 #
                 # Re-add previously configured ports
                 #
-                for port in self.port_data.keys():
+                for port in list(self.port_data.keys()):
                     self.port_data[port] = self._reserve_port(port)
 
         return self.is_connected()
