@@ -1351,6 +1351,16 @@ __NOTE__: You might be surprised the VM is not added here, but that is done
 automatically by Qemu when the VM is started.
 
 
+## Disable OvS-DPDK
+
+We need to disable OVS-DPDK to make sure the PMD processes are no longer
+consuming valuable CPU resources:
+
+```
+ovs-vsctl set Open_vSwitch . other_config:dpdk-init=false
+systemctl restart openvswitch
+```
+
 ## Creating a VM for use with the Open vSwitch bridge
 
 First, we need to stop the existing VM, and clone it:
