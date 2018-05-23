@@ -240,7 +240,9 @@ def test_p2v2p(nr_of_flows, packet_sizes):
 
     p2v2p_results = list()
     cpu_results = list()
-    warm_up_error_continue = 0
+    wait_time = 0
+    active_flows = 0
+    warm_up_error = 0
 
     for packet_size in packet_sizes:
 
@@ -273,11 +275,28 @@ def test_p2v2p(nr_of_flows, packet_sizes):
 
             tester.start_traffic(config.tester_interface)
 
-            warm_up_error_continue = warm_up_verify(nr_of_flows * 2,
+            warm_up_error = warm_up_verify(nr_of_flows * 2,
                                         config.warm_up_timeout)
+            tester.stop_traffic(config.tester_interface)
 
-            if not warm_up_error_continue:
-                tester.stop_traffic(config.tester_interface)
+            if warm_up_error:
+                if config.warm_up_no_fail:
+
+                    stop_traffic_loop_on_vm(config.dut_vm_address)
+
+		    lprint("INFO: Waiting for Datapath flows to flush")
+
+                    active_flows = get_active_datapath_flows()
+                    while active_flows > 32:
+                        wait_time += 1
+                        if wait_time >= 20:
+                            lprint("ERROR: Failed to complete cool-down in time (20 seconds)!")
+                            sys.exit(-1)
+                        active_flows = get_active_datapath_flows()
+                        time.sleep(1)
+                else:
+                    sys.exit(-1)
+
 
         ##################################################
         lprint("  * Clear all statistics...")
@@ -289,7 +308,7 @@ def test_p2v2p(nr_of_flows, packet_sizes):
             = get_of_port_packet_stats(of_interfaces[config.virtual_interface])
 
         ##################################################
-        if not config.warm_up or warm_up_error_continue:
+        if not config.warm_up or warm_up_error:
             lprint("  * Start packet receiver on VM...")
             start_traffic_loop_on_vm(config.dut_vm_address,
                                      config.dut_vm_nic_pci)
@@ -415,6 +434,9 @@ def test_p2v(nr_of_flows, packet_sizes):
 
     p2v_results = list()
     cpu_results = list()
+    wait_time = 0
+    active_flows = 0
+    warm_up_error = 0
 
     for packet_size in packet_sizes:
 
@@ -441,8 +463,22 @@ def test_p2v(nr_of_flows, packet_sizes):
         if config.warm_up:
             lprint("  * Doing flow table warm-up...")
             tester.start_traffic(config.tester_interface)
-            warm_up_verify(nr_of_flows, config.warm_up_timeout)
+            warm_up_error = warm_up_verify(nr_of_flows, config.warm_up_timeout)
             tester.stop_traffic(config.tester_interface)
+            if warm_up_error:
+                if config.warm_up_no_fail:
+		    lprint("INFO: Waiting for Datapath flows to flush")
+
+                    active_flows = get_active_datapath_flows()
+                    while active_flows > 32:
+                        wait_time += 1
+                        if wait_time >= 20:
+                            lprint("ERROR: Failed to complete cool-down in time (20 seconds)!")
+                            sys.exit(-1)
+                        active_flows = get_active_datapath_flows()
+                        time.sleep(1)
+                else:
+                    sys.exit(-1)
 
         ##################################################
         lprint("  * Clear all statistics...")
@@ -547,6 +583,9 @@ def test_p2p(nr_of_flows, packet_sizes):
 
     p2p_results = list()
     cpu_results = list()
+    wait_time = 0
+    active_flows = 0
+    warm_up_error = 0
 
     for packet_size in packet_sizes:
 
@@ -574,8 +613,22 @@ def test_p2p(nr_of_flows, packet_sizes):
         if config.warm_up:
             lprint("  * Doing flow table warm-up...")
             tester.start_traffic(config.tester_interface)
-            warm_up_verify(nr_of_flows, config.warm_up_timeout)
+            warm_up_error = warm_up_verify(nr_of_flows, config.warm_up_timeout)
             tester.stop_traffic(config.tester_interface)
+            if warm_up_error:
+                if config.warm_up_no_fail:
+		    lprint("INFO: Waiting for Datapath flows to flush")
+
+                    active_flows = get_active_datapath_flows()
+                    while active_flows > 32:
+                        wait_time += 1
+                        if wait_time >= 20:
+                            lprint("ERROR: Failed to complete cool-down in time (20 seconds)!")
+                            sys.exit(-1)
+                        active_flows = get_active_datapath_flows()
+                        time.sleep(1)
+                else:
+                    sys.exit(-1)
 
         ##################################################
         lprint("  * Clear all statistics...")
@@ -848,41 +901,21 @@ def get_active_datapath_flows():
 #
 def warm_up_verify(requested_flows, timeout):
     run_time = 0
-    wait_time = 0
     active_flows = 0
-    error_continue = 0
 
     while active_flows < requested_flows:
         run_time += 1
         if timeout != 0 and run_time >= timeout:
-	    if config.warm_up_no_fail:
-		lprint("WARNING: Warm up failed. Waiting for Datapath flows to flush")
-
-                tester.stop_traffic(config.tester_interface)
-                stop_traffic_loop_on_vm(config.dut_vm_address)
-                active_flows = get_active_datapath_flows()
-
-                while active_flows > 32:
-                    wait_time += 1
-                    if wait_time >= 20:
-                        lprint("ERROR: Failed to complete cool-down in time (20 seconds)!")
-                        sys.exit(-1)
-                        break
-                    active_flows = get_active_datapath_flows()
-                    time.sleep(1)
-                error_continue = 1
-		return error_continue
-            else:
 	        lprint("ERROR: Failed to complete warm-up in time ({} seconds)!".
                        format(timeout))
-                sys.exit(-1)
+                return 1
 
         time.sleep(1)
         active_flows = get_active_datapath_flows()
     #
     # Flows exist, we can continue now
     #
-    return error_continue
+    return 0
 
 
 #
