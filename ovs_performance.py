@@ -287,6 +287,7 @@ def test_p2v2p(nr_of_flows, packet_sizes):
 		    lprint("INFO: Waiting for Datapath flows to flush")
 
                     active_flows = get_active_datapath_flows()
+                    wait_time = 0
                     while active_flows > 32:
                         wait_time += 1
                         if wait_time >= 20:
@@ -470,6 +471,7 @@ def test_p2v(nr_of_flows, packet_sizes):
 		    lprint("INFO: Waiting for Datapath flows to flush")
 
                     active_flows = get_active_datapath_flows()
+                    wait_time = 0
                     while active_flows > 32:
                         wait_time += 1
                         if wait_time >= 20:
@@ -620,6 +622,7 @@ def test_p2p(nr_of_flows, packet_sizes):
 		    lprint("INFO: Waiting for Datapath flows to flush")
 
                     active_flows = get_active_datapath_flows()
+                    wait_time = 0
                     while active_flows > 32:
                         wait_time += 1
                         if wait_time >= 20:
