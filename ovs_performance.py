@@ -252,9 +252,10 @@ def test_p2v2p(nr_of_flows, packet_sizes):
         ##################################################
         lprint("  * Create OVS OpenFlow rules...")
 
-        create_ovs_bidirectional_of_rules(nr_of_flows,
-                                          of_interfaces[config.physical_interface],
-                                          of_interfaces[config.virtual_interface])
+        create_ovs_bidirectional_of_rules(
+            nr_of_flows,
+            of_interfaces[config.physical_interface],
+            of_interfaces[config.virtual_interface])
 
         ##################################################
         lprint("  * Initializing packet generation...")
@@ -274,7 +275,7 @@ def test_p2v2p(nr_of_flows, packet_sizes):
             tester.start_traffic(config.tester_interface)
 
             warm_up_done = warm_up_verify(nr_of_flows * 2,
-                                        config.warm_up_timeout)
+                                          config.warm_up_timeout)
             tester.stop_traffic(config.tester_interface)
 
             if not warm_up_done:
@@ -284,7 +285,6 @@ def test_p2v2p(nr_of_flows, packet_sizes):
                     flow_table_cool_down()
                 else:
                     sys.exit(-1)
-
 
         ##################################################
         lprint("  * Clear all statistics...")
@@ -852,11 +852,11 @@ def test_vxlan(nr_of_flows, packet_sizes):
 #
 def get_active_datapath_flows():
     if ovs_data_path == "netdev":
-        cmd = 'sh -c "ovs-appctl dpctl/dump-flows netdev@ovs-netdev | ' \
-              "grep -v 'flow-dump from pmd on cpu core:' | " \
-              'wc -l"'
+        cmd = 'sh -c "ovs-appctl dpctl/show netdev@ovs-netdev | ' \
+              'grep flows | awk \'{print $2}\'"'
     else:
-        cmd = 'sh -c "ovs-appctl  dpctl/show system@ovs-system| grep flows| awk \'{print $2}\'"'
+        cmd = 'sh -c "ovs-appctl dpctl/show system@ovs-system | ' \
+              'grep flows | awk \'{print $2}\'"'
 
     result = dut_shell.dut_exec(cmd, die_on_error=True)
     return int(result.stdout_output)
@@ -873,7 +873,7 @@ def warm_up_verify(requested_flows, timeout):
         run_time += 1
         if timeout != 0 and run_time >= timeout:
             lprint("ERROR: Failed to complete warm-up in time ({} seconds)!".
-                     format(timeout))
+                   format(timeout))
             return False
 
         time.sleep(1)
@@ -899,14 +899,17 @@ def flow_table_cool_down(failure_fatal=True):
             run_time += 1
             if run_time >= 20:
                 if failure_fatal:
-                    lprint("ERROR: Failed to complete cool-down in time (20 seconds)!")
+                    lprint("ERROR: Failed to complete cool-down in time "
+                           "(20 seconds)!")
                     sys.exit(-1)
                 else:
-                    lprint("WARNING: Failed to complete cool-down in time (20 seconds)!")
+                    lprint("WARNING: Failed to complete cool-down in time "
+                           "(20 seconds)!")
                     break
 
             active_flows = get_active_datapath_flows()
             time.sleep(1)
+
 
 #
 # Flush all OVS flows
@@ -933,7 +936,6 @@ def flush_ovs_flows():
 
     flow_table_cool_down(failure_fatal=False)
     time.sleep(2)
-
 
 
 #
@@ -1230,7 +1232,7 @@ def create_ovs_bidirectional_of_phy_rules(src_port, dst_port):
     lprint("  * Clear all OpenFlow/Datapath rules on bridge \"{}\"...".
            format(config.bridge_name))
 
-    dut_shell.dut_exec('sh -c "ovs-ofctl del-flows {0}"'.\
+    dut_shell.dut_exec('sh -c "ovs-ofctl del-flows {0}"'.
                        format(config.bridge_name),
                        die_on_error=True)
 
