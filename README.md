@@ -954,6 +954,8 @@ usage: ovs_performance.py [-h] [--bridge-name BRIDGE] [-d] [--debug-dut-shell]
                           [--dut-vm-address ADDRESS] [--dut-vm-nic-pci PCI]
                           [--dut-vm-user USER] [--dut-vm-password PASSWORD]
                           [--dut-vm-nic-queues QUEUES]
+                          [--dut-vm-nic-rxd DESCRIPTORS]
+                          [--dut-vm-nic-txd DESCRIPTORS]
                           [--flow-type {L2,L3,L4-UDP}] [-g]
                           [--no-bridge-config] [-o ADDRESS] [--ovs-user USER]
                           [--ovs-password PASSWORD] [-p DEVICE] [--perf]
@@ -963,9 +965,12 @@ usage: ovs_performance.py [-h] [--bridge-name BRIDGE] [-d] [--debug-dut-shell]
                           [--physical-speed GBPS] [--packet-list LIST]
                           [-r SECONDS] [--run-pp-test] [--skip-pv-test]
                           [--skip-pvp-test] [--stream-list LIST] [--warm-up]
-                          [-v DEVICE] [-x ADDRESS] [--tester-type {xena,trex}]
-                          [-i {MOD,}PORT]
+                          [--warm-up-timeout SECONDS] [--warm-up-no-fail]
+                          [--no-cool-down] [-v DEVICE] [-x ADDRESS]
+                          [--tester-type {xena,trex}] [-i {MOD,}PORT]
                           [--second-tester-interface {MOD,}PORT] [-l FILE]
+                          [--dst-mac-address DST_MAC_ADDRESS]
+                          [--src-mac-address SRC_MAC_ADDRESS] [--mac-swap]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -986,6 +991,10 @@ optional arguments:
   --dut-vm-nic-queues QUEUES
                         Number of VM nic queues (and cores) to allocate,
                         default 1
+  --dut-vm-nic-rxd DESCRIPTORS
+                        Number of VM nic receive descriptors, default 4096
+  --dut-vm-nic-txd DESCRIPTORS
+                        Number of VM nic transmit descriptors, default 1024
   --flow-type {L2,L3,L4-UDP}
                         Flow type used for the tests, default L3
   -g, --gui             Show graph GUI
@@ -1014,6 +1023,10 @@ optional arguments:
   --skip-pvp-test       Do not run the P to V to P test
   --stream-list LIST    List of stream sizes to test
   --warm-up             Do flow warm-up round before tests
+  --warm-up-timeout SECONDS
+                        Warm up timeout
+  --warm-up-no-fail     Continue running the test even if warm up times out
+  --no-cool-down        Do not wait for datapath flows to be cleared
   -v DEVICE, --virtual-interface DEVICE
                         Virtual interface
   -x ADDRESS, --tester-address ADDRESS
@@ -1026,6 +1039,11 @@ optional arguments:
                         Second tester interface
   -l FILE, --logging FILE
                         Redirecting log output to file
+  --dst-mac-address DST_MAC_ADDRESS
+                        Destination Base MAC address
+  --src-mac-address SRC_MAC_ADDRESS
+                        Source Base MAC address
+  --mac-swap            Swap source/destination mac at VM
 ```
 
 __NOTES:__
