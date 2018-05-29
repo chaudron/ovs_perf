@@ -60,6 +60,9 @@ read DUT_PW
 echo -n "What is the IP address of the virtual machine running on the DUT? "
 read VM_IP
 
+echo -n "What is the root password of the VM? "
+read VM_PW
+
 echo -n "What is the IP address of the TRex tester? "
 read TREX_IP
 
@@ -71,6 +74,14 @@ read VM_INT
 
 echo -n "What is the virtual interface PCI id? "
 read VM_PCI
+
+echo -n "Enter the Number of VM nic receive descriptors, 4096(default)? "
+read VM_RXD
+VM_RXD=${VM_RXD:-4096}
+
+echo -n "Enter the Number of Number of VM nic transmit descriptors, 1024(default)? "
+read VM_TXD
+VM_TXD=${VM_TXD:-1024}
 
 echo -n "What is the TRex tester physical interface being used? "
 read TREX_INT
@@ -97,7 +108,7 @@ cd ~/pvp_results_10_l2_$DATAPATH
   --ovs-password $DUT_PW \
   --dut-vm-address $VM_IP \
   --dut-vm-user root \
-  --dut-vm-password root \
+  --dut-vm-password $VM_PW \
   --dut-vm-nic-queues=$NIC_Q \
   --physical-interface $PHY_INT \
   --physical-speed=$NIC_SPD \
@@ -106,6 +117,8 @@ cd ~/pvp_results_10_l2_$DATAPATH
   --no-bridge-config \
   --skip-pv-test \
   --flow-type=L2 \
+  --dut-vm-nic-rxd=$VM_RXD \
+  --dut-vm-nic-txd=$VM_TXD \
   --run-time=1000
 
 
@@ -121,7 +134,7 @@ cd ~/pvp_results_10_l3_$DATAPATH
   --ovs-password $DUT_PW \
   --dut-vm-address $VM_IP \
   --dut-vm-user root \
-  --dut-vm-password root \
+  --dut-vm-password $VM_PW \
   --dut-vm-nic-queues=$NIC_Q \
   --physical-interface $PHY_INT \
   --physical-speed=$NIC_SPD \
@@ -130,6 +143,8 @@ cd ~/pvp_results_10_l3_$DATAPATH
   --no-bridge-config \
   --skip-pv-test \
   --flow-type=L3 \
+  --dut-vm-nic-rxd=$VM_RXD \
+  --dut-vm-nic-txd=$VM_TXD \
   --run-time=1000
 
 
@@ -145,7 +160,7 @@ cd ~/pvp_results_1_l2_$DATAPATH
   --ovs-password $DUT_PW \
   --dut-vm-address $VM_IP \
   --dut-vm-user root \
-  --dut-vm-password root \
+  --dut-vm-password $VM_PW \
   --dut-vm-nic-queues=$NIC_Q \
   --physical-interface $PHY_INT \
   --physical-speed=$NIC_SPD \
@@ -153,6 +168,8 @@ cd ~/pvp_results_1_l2_$DATAPATH
   --dut-vm-nic-pci=$VM_PCI \
   --no-bridge-config \
   --skip-pv-test \
+  --dut-vm-nic-rxd=$VM_RXD \
+  --dut-vm-nic-txd=$VM_TXD \
   --flow-type=L2
 
 
@@ -168,7 +185,7 @@ cd ~/pvp_results_1_l3_$DATAPATH
   --ovs-password $DUT_PW \
   --dut-vm-address $VM_IP \
   --dut-vm-user root \
-  --dut-vm-password root \
+  --dut-vm-password $VM_PW \
   --dut-vm-nic-queues=$NIC_Q \
   --physical-interface $PHY_INT \
   --physical-speed=$NIC_SPD \
@@ -176,6 +193,8 @@ cd ~/pvp_results_1_l3_$DATAPATH
   --dut-vm-nic-pci=$VM_PCI \
   --no-bridge-config \
   --skip-pv-test \
+  --dut-vm-nic-rxd=$VM_RXD \
+  --dut-vm-nic-txd=$VM_TXD \
   --flow-type=L3
 
 
