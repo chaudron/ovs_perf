@@ -60,8 +60,9 @@ read DUT_PW
 echo -n "What is the IP address of the virtual machine running on the DUT? "
 read VM_IP
 
-echo -n "What is the root password of the VM? "
+echo -n "What is the root password of the VM (default: root)? "
 read VM_PW
+VM_PW=${VM_PW:-"root"}
 
 echo -n "What is the IP address of the TRex tester? "
 read TREX_IP
@@ -93,12 +94,11 @@ case $NIC_SPD in
 *) NIC_SPD=10 ;;
 esac
 
-unset MAX_STREAMS
-while (( MAX_STREAMS <= 100000 || MAX_STREAMS > 1000000 )); do
-echo -n "Enter maxium L2/L3 streams for the test: 1000000(default), must be > 100000? "
-read MAX_STREAMS
-MAX_STREAMS=${MAX_STREAMS:-1000000}
-done
+unset STREAM_LIST
+DEFAULT_STREAM_LIST="10, 1000, 10000, 100000, 1000000"
+echo -n "Enter L2/L3 streams list. default($DEFAULT_STREAM_LIST) "
+read STREAM_LIST
+STREAM_LIST=${STREAM_LIST:-$DEFAULT_STREAM_LIST}
 
 #
 # Execute the four tests in order...
@@ -126,8 +126,8 @@ cd ~/pvp_results_10_l2_$DATAPATH
   --flow-type=L2 \
   --dut-vm-nic-rxd=$VM_RXD \
   --dut-vm-nic-txd=$VM_TXD \
-  --stream-limit=$MAX_STREAMS \
-  --run-time=20
+  --stream-list=$STREAM_LIST \
+  --run-time=1000
 
 
 mkdir -p ~/pvp_results_10_l3_$DATAPATH
@@ -153,8 +153,8 @@ cd ~/pvp_results_10_l3_$DATAPATH
   --flow-type=L3 \
   --dut-vm-nic-rxd=$VM_RXD \
   --dut-vm-nic-txd=$VM_TXD \
-  --stream-limit=$MAX_STREAMS \
-  --run-time=20
+  --stream-list=$STREAM_LIST \
+  --run-time=1000
 
 
 mkdir -p ~/pvp_results_1_l2_$DATAPATH
@@ -179,7 +179,7 @@ cd ~/pvp_results_1_l2_$DATAPATH
   --skip-pv-test \
   --dut-vm-nic-rxd=$VM_RXD \
   --dut-vm-nic-txd=$VM_TXD \
-  --stream-limit=$MAX_STREAMS \
+  --stream-list=$STREAM_LIST \
   --flow-type=L2
 
 
@@ -205,7 +205,7 @@ cd ~/pvp_results_1_l3_$DATAPATH
   --skip-pv-test \
   --dut-vm-nic-rxd=$VM_RXD \
   --dut-vm-nic-txd=$VM_TXD \
-  --stream-limit=$MAX_STREAMS \
+  --stream-list=$STREAM_LIST \
   --flow-type=L3
 
 
@@ -220,11 +220,13 @@ echo
 #
 # Check that all test have packets passing...
 #
-if grep -h -E "^10,|^1000,|^10000,|^100000,|^$MAX_STREAMS," \
-    ~/pvp_results_1*_l*_*/test_results_l*.csv | \
-    tr -s '\n\r' ',' | grep -q ",0,"; then
-  echo "!! ERROR: Failed test, found a test with 0 packet throughput!!"
-fi
+for stream in ${STREAM_LIST//,/ }; do
+    if grep -h -E "^$stream," \
+      ~/pvp_results_1*_l*_*/test_results_l*.csv | \
+      tr -s '\n\r' ',' | grep -q ",0,"; then
+        echo "!! ERROR: Failed test, found a test with 0 packet throughput!!"
+    fi
+done
 
 #
 # Check the 256 byte, 10 Flow test, and make sure they have at least 75%

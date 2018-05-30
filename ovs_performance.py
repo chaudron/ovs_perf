@@ -130,8 +130,7 @@ DEFAULT_PACKET_LIST               = '64, 128, 256, 512, 768, 1024, 1514'
 DEFAULT_VIRTUAL_INTERFACE         = ''
 DEFAULT_SECOND_VIRTUAL_INTERFACE  = ''
 DEFAULT_RUN_TIME                  = 20
-DEFAULT_MAX_STREAMS               = '1000000'
-DEFAULT_STREAM_LIST               = '10, 1000, 10000, 100000'
+DEFAULT_STREAM_LIST               = '10, 1000, 10000, 100000, 1000000'
 DEFAULT_BRIDGE_NAME               = 'ovs_pvp_br0'
 DEFAULT_WARM_UP_TIMEOUT           = 360
 DEFAULT_DST_MAC_ADDRESS           = '00:00:02:00:00:00'
@@ -2394,17 +2393,6 @@ def csv_write_test_results(csv_handle, test_name, flow_size_list,
 
 
 #
-# Append a value to a comma separated list.
-#
-def append_to_list(list_string, value):
-
-    list_new = list_string.split(',')
-    list_new.append(value)
-    s = ","
-    str_new =  s.join(list_new)
-    return str_new
-
-#
 # Check a string of list entries, and make sure they are valid number,
 # and are in order.
 #
@@ -2714,7 +2702,6 @@ def main():
     global ovs_version
     global vm_dpdk_version
     global run_start_time
-    global stream_limit
 
     run_start_time = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 
@@ -2818,9 +2805,6 @@ def main():
     parser.add_argument("--stream-list", metavar="LIST",
                         help="List of stream sizes to test", type=str,
                         default=DEFAULT_STREAM_LIST)
-    parser.add_argument("--stream-limit", metavar="MAX-FLOWS",
-                        help="Maximum stream size to test. Must be > 100000", type=str,
-                        default=DEFAULT_MAX_STREAMS)
     parser.add_argument("--warm-up",
                         help="Do flow warm-up round before tests", action="store_true")
     parser.add_argument("--warm-up-timeout", metavar="SECONDS",
@@ -2981,9 +2965,7 @@ def main():
         lprint("ERROR: Invalid second tester interface configuration!")
         sys.exit(-1)
 
-    config.stream_list = append_to_list(config.stream_list, config.stream_limit)
 
-    print config.stream_list
     if not check_list(config.stream_list, 1, 1000000):
         lprint("ERROR: Invalid stream list, \"{}\", supplied!".format(config.stream_list))
         sys.exit(-1)
