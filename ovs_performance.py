@@ -2965,7 +2965,6 @@ def main():
         lprint("ERROR: Invalid second tester interface configuration!")
         sys.exit(-1)
 
-
     if not check_list(config.stream_list, 1, 1000000):
         lprint("ERROR: Invalid stream list, \"{}\", supplied!".format(config.stream_list))
         sys.exit(-1)
