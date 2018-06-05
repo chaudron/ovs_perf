@@ -1289,7 +1289,7 @@ What datapath are you using, DPDK or Linux Kernel [dpdk/kernel/tc]? dpdk
 What is the IP address where the DUT (Open vSwitch) is running? 10.19.17.133
 What is the root password of the DUT? root
 What is the IP address of the virtual machine running on the DUT? 192.168.122.186
-What is the root password of the VM? root
+What is the root password of the VM (default: root)? root
 What is the IP address of the TRex tester? localhost
 What is the physical interface being used, i.e. dpdk0, em1, p4p5? dpdk0
 What is the virtual interface being used, i.e. vhost0, vnet0? vhost0
@@ -1298,7 +1298,7 @@ Enter the Number of VM nic receive descriptors, 4096(default)? 4096
 Enter the Number of Number of VM nic transmit descriptors, 1024(default)? 1024
 What is the TRex tester physical interface being used? 0
 What is the link speed of the physical interface, i.e. 10(default),25,40,50,100? 10
-Enter L2/L3 streams list. default(10, 1000, 10000, 100000, 1000000)? 10,1000,10000,100000,1000000
+Enter L2/L3 streams list. default(10,1000,10000,100000,1000000)? 10,1000,10000,100000,1000000
 - Connecting to the tester...
 - Connecting to DUT, "10.19.17.133"...
 ...
