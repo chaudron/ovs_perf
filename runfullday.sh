@@ -60,6 +60,10 @@ read DUT_PW
 echo -n "What is the IP address of the virtual machine running on the DUT? "
 read VM_IP
 
+echo -n "What is the root password of the VM (default: root)? "
+read VM_PW
+VM_PW=${VM_PW:-"root"}
+
 echo -n "What is the IP address of the TRex tester? "
 read TREX_IP
 
@@ -72,6 +76,14 @@ read VM_INT
 echo -n "What is the virtual interface PCI id? "
 read VM_PCI
 
+echo -n "Enter the Number of VM nic receive descriptors, 4096(default)? "
+read VM_RXD
+VM_RXD=${VM_RXD:-4096}
+
+echo -n "Enter the Number of Number of VM nic transmit descriptors, 1024(default)? "
+read VM_TXD
+VM_TXD=${VM_TXD:-1024}
+
 echo -n "What is the TRex tester physical interface being used? "
 read TREX_INT
 
@@ -81,6 +93,12 @@ case $NIC_SPD in
 10 | 25 | 40 | 50 | 100) ;;
 *) NIC_SPD=10 ;;
 esac
+
+unset STREAM_LIST
+DEFAULT_STREAM_LIST="10,1000,10000,100000,1000000"
+echo -n "Enter L2/L3 streams list. default($DEFAULT_STREAM_LIST)? "
+read STREAM_LIST
+STREAM_LIST=${STREAM_LIST:-$DEFAULT_STREAM_LIST}
 
 #
 # Execute the four tests in order...
@@ -97,7 +115,7 @@ cd ~/pvp_results_10_l2_$DATAPATH
   --ovs-password $DUT_PW \
   --dut-vm-address $VM_IP \
   --dut-vm-user root \
-  --dut-vm-password root \
+  --dut-vm-password $VM_PW \
   --dut-vm-nic-queues=$NIC_Q \
   --physical-interface $PHY_INT \
   --physical-speed=$NIC_SPD \
@@ -106,6 +124,9 @@ cd ~/pvp_results_10_l2_$DATAPATH
   --no-bridge-config \
   --skip-pv-test \
   --flow-type=L2 \
+  --dut-vm-nic-rxd=$VM_RXD \
+  --dut-vm-nic-txd=$VM_TXD \
+  --stream-list=$STREAM_LIST \
   --run-time=1000
 
 
@@ -121,7 +142,7 @@ cd ~/pvp_results_10_l3_$DATAPATH
   --ovs-password $DUT_PW \
   --dut-vm-address $VM_IP \
   --dut-vm-user root \
-  --dut-vm-password root \
+  --dut-vm-password $VM_PW \
   --dut-vm-nic-queues=$NIC_Q \
   --physical-interface $PHY_INT \
   --physical-speed=$NIC_SPD \
@@ -130,6 +151,9 @@ cd ~/pvp_results_10_l3_$DATAPATH
   --no-bridge-config \
   --skip-pv-test \
   --flow-type=L3 \
+  --dut-vm-nic-rxd=$VM_RXD \
+  --dut-vm-nic-txd=$VM_TXD \
+  --stream-list=$STREAM_LIST \
   --run-time=1000
 
 
@@ -145,7 +169,7 @@ cd ~/pvp_results_1_l2_$DATAPATH
   --ovs-password $DUT_PW \
   --dut-vm-address $VM_IP \
   --dut-vm-user root \
-  --dut-vm-password root \
+  --dut-vm-password $VM_PW \
   --dut-vm-nic-queues=$NIC_Q \
   --physical-interface $PHY_INT \
   --physical-speed=$NIC_SPD \
@@ -153,6 +177,9 @@ cd ~/pvp_results_1_l2_$DATAPATH
   --dut-vm-nic-pci=$VM_PCI \
   --no-bridge-config \
   --skip-pv-test \
+  --dut-vm-nic-rxd=$VM_RXD \
+  --dut-vm-nic-txd=$VM_TXD \
+  --stream-list=$STREAM_LIST \
   --flow-type=L2
 
 
@@ -168,7 +195,7 @@ cd ~/pvp_results_1_l3_$DATAPATH
   --ovs-password $DUT_PW \
   --dut-vm-address $VM_IP \
   --dut-vm-user root \
-  --dut-vm-password root \
+  --dut-vm-password $VM_PW \
   --dut-vm-nic-queues=$NIC_Q \
   --physical-interface $PHY_INT \
   --physical-speed=$NIC_SPD \
@@ -176,6 +203,9 @@ cd ~/pvp_results_1_l3_$DATAPATH
   --dut-vm-nic-pci=$VM_PCI \
   --no-bridge-config \
   --skip-pv-test \
+  --dut-vm-nic-rxd=$VM_RXD \
+  --dut-vm-nic-txd=$VM_TXD \
+  --stream-list=$STREAM_LIST \
   --flow-type=L3
 
 
@@ -190,11 +220,13 @@ echo
 #
 # Check that all test have packets passing...
 #
-if grep -h -E "^10,|^1000,|^10000,|^100000,|^1000000," \
-    ~/pvp_results_1*_l*_*/test_results_l*.csv | \
-    tr -s '\n\r' ',' | grep -q ",0,"; then
-  echo "!! ERROR: Failed test, found a test with 0 packet throughput!!"
-fi
+for stream in ${STREAM_LIST//,/ }; do
+    if grep -h -E "^$stream," \
+      ~/pvp_results_1*_l*_*/test_results_l*.csv | \
+      tr -s '\n\r' ',' | grep -q ",0,"; then
+        echo "!! ERROR: Failed test, found a test with 0 packet throughput!!"
+    fi
+done
 
 #
 # Check the 256 byte, 10 Flow test, and make sure they have at least 75%
