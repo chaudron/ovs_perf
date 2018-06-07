@@ -2589,13 +2589,13 @@ def get_vm_dpdk_version(vm):
 
     cmd = r"sshpass -p {2} ssh -o UserKnownHostsFile=/dev/null " \
           r"-o StrictHostKeyChecking=no -n {1}@{0} " \
-          r"'testpmd -v | grep \"EAL: RTE Version\"'". \
+          r"testpmd -v". \
           format(vm, config.dut_vm_user, config.dut_vm_password)
 
     result = dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd],
                                 die_on_error=False)
 
-    m = re.search('.*DPDK ([0-9]+\.[0-9]+\.[0-9]+).*',
+    m = re.search('DPDK ([0-9]+\.[0-9]+\.[0-9]+)',
                   result.output)
     if m:
         return str(m.group(1))
