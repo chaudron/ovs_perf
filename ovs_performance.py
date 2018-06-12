@@ -1212,14 +1212,20 @@ def create_ovs_of_rules(number_of_flows, src_port, dst_port, **kwargs):
 #
 # Add OVS OpenFlow rules
 #
-def create_ovs_bidirectional_of_rules(number_of_flows, src_port, dst_port, **kwargs):
+def create_ovs_bidirectional_of_rules(number_of_flows, src_port,
+                                      dst_port, **kwargs):
 
     if config.flow_type == 'L2':
-        create_ovs_bidirectional_l2_of_rules(number_of_flows, src_port, dst_port, **kwargs)
+        create_ovs_bidirectional_l2_of_rules(number_of_flows, src_port,
+                                             dst_port, **kwargs)
+    elif config.flow_type == 'L2-NORMAL':
+        create_ovs_of_normal_rule(**kwargs)
     elif config.flow_type == 'L3':
-        create_ovs_bidirectional_l3_of_rules(number_of_flows, src_port, dst_port, **kwargs)
+        create_ovs_bidirectional_l3_of_rules(number_of_flows, src_port,
+                                             dst_port, **kwargs)
     elif config.flow_type == 'L4-UDP':
-        create_ovs_bidirectional_l4_of_rules(number_of_flows, src_port, dst_port, **kwargs)
+        create_ovs_bidirectional_l4_of_rules(number_of_flows, src_port,
+                                             dst_port, **kwargs)
     else:
         raise ValueError("No support for this protocol!!")
 
@@ -1348,6 +1354,39 @@ def create_ovs_bidirectional_l2_of_rules(number_of_flows, src_port, dst_port, **
                            total_number_of_flows=number_of_flows * 2,
                            clear_rules=False,
                            mac_swap=config.mac_swap)
+
+
+#
+# Add OVS OpenFlow NORMAL rule to bridge
+#
+def create_ovs_of_normal_rule(**kwargs):
+    clear_rules = kwargs.pop("clear_rules", True)
+
+    if clear_rules:
+        lprint("  * Clear all OpenFlow/Datapath rules on bridge \"{}\"...".
+               format(config.bridge_name))
+        flush_ovs_flows()
+
+        cmd = "ovs-appctl fdb/flush {}".format(config.bridge_name)
+        dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd], die_on_error=True)
+
+    lprint("  * Create OpenFlow NORMAL rules...")
+
+    cmd = "ovs-ofctl add-flow {0} action=NORMAL". \
+          format(config.bridge_name)
+    dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd], die_on_error=True)
+
+    lprint("  * Verify that OpenFlow NORMAL flow exists...")
+
+    result = dut_shell.dut_exec('sh -c "ovs-ofctl dump-flows {0} | '
+                                'grep -v \'NXST_FLOW reply\'"'.
+                                format(config.bridge_name),
+                                die_on_error=True)
+
+    if result.output.count('\n') != 1:
+        lprint("ERROR: Only 1 flows should exsits, but there are {0}!".
+               format(result.output.count('\n')))
+        sys.exit(-1)
 
 
 #
@@ -2363,6 +2402,8 @@ def csv_write_test_results(csv_handle, test_name, flow_size_list,
 
     if config.flow_type == 'L2':
         flow_type = ", L2 flows"
+    elif config.flow_type == 'L2-NORMAL':
+        flow_type = ", L2 flows[NORMAL]"
     elif config.flow_type == 'L3':
         flow_type = ", L3 flows"
     elif config.flow_type == 'L4-UDP':
@@ -2645,24 +2686,25 @@ def get_of_bridge_mac_address(bridge):
 #
 # Flow type definitions
 #
-flow_types = ['L2', 'L3', 'L4-UDP']
+flow_types = ['L2', 'L2-NORMAL', 'L3', 'L4-UDP']
 
 
 def get_flow_type_short():
     labels = dict(list(zip(flow_types,
-                           ['L2', 'L3', 'L4-UDP'])))
+                           ['L2', 'L2-NORMAL', 'L3', 'L4-UDP'])))
     return labels[config.flow_type]
 
 
 def get_flow_type_name():
     labels = dict(list(zip(flow_types,
-                           ['l2', 'l3', 'l4_udp'])))
+                           ['l2', 'l2_NORMAL', 'l3', 'l4_udp'])))
     return labels[config.flow_type]
 
 
 def get_traffic_generator_flow():
     flow_type = dict(list(zip(flow_types,
                               [TrafficFlowType.l2_mac,
+                               TrafficFlowType.l2_mac,  # L2_NORMAL=L2 traffic
                                TrafficFlowType.l3_ipv4,
                                TrafficFlowType.l4_udp])))
     return flow_type[config.flow_type]
@@ -2896,7 +2938,7 @@ def main():
         lprint("ERROR: You must supply a Source Base MAC Address")
         sys.exit(-1)
 
-    if config.flow_type == 'L2':
+    if config.flow_type == 'L2' or config.flow_type == 'L2-NORMAL':
         if (int(config.src_mac_address.replace(":", ""), 16) & 0xffffff) \
            != 0:
             lprint("ERROR: For L2 tests the Source Base MAC address must "
@@ -3015,6 +3057,18 @@ def main():
 
     if config.warm_up and (not config.skip_vv_test or config.run_vxlan_test):
         lprint("WARNING: Warm-up only works for P2P, P2V, and P2V2P tests!")
+
+    if config.flow_type == 'L2-NORMAL':
+        if not config.skip_vv_test or not config.skip_pv_test or \
+           config.run_pp_test:
+            lprint("ERROR: The L2-NORMAL flow type is only tested/supported "
+                   "with the PVP test!")
+            sys.exit(-1)
+
+        if not config.mac_swap:
+            lprint("ERROR: The L2-NORMAL flow type requires the --mac-swap "
+                   "option!")
+            sys.exit(-1)
 
     #
     # Dump settings if global debug is enabled
@@ -3196,6 +3250,8 @@ def main():
 
     if config.flow_type == 'L2':
         csv_file = "test_results_l2.csv"
+    elif config.flow_type == 'L2-NORMAL':
+        csv_file = "test_results_l2_normal.csv"
     elif config.flow_type == 'L3':
         csv_file = "test_results_l3.csv"
     elif config.flow_type == 'L4-UDP':
