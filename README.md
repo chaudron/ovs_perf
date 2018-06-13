@@ -1515,6 +1515,265 @@ __NOTE__: This section does not go over any additional tuning that can be done
 for the kernel datapath.
 
 
+## Test with Open vSwitch full offload (data and control path) to NIC
+
+
+Offloading OVS entirely to a NIC requires the NIC to support execution of the control plane in addition to accelerating the data plane of OVS. We'll take the example of Cavium's LiquidIO-II SmartNIC
+adapter for this example.
+
+Follow the documentation from [here](#DUTsetup) for the initial setup.
+
+Since the control and data plane functions of OVS are offloaded to the NIC, the openvswitch service
+must be stopped in the host server (DUT).
+
+```
+# systemctl disable openvswitch
+# systemctl stop openvswitch
+# rmmod openvswitch
+```
+
+To allow full offload of OVS to LiquidIO-II adapter, the liquidio driver kernel module must be configured
+to use the appropriate firmware
+
+```
+modprobe liquidio fw_type=vsw
+```
+
+Now, let's enable the SRIOV Virtual functions for the LiquidIO-II adapter. For this example, we'll enable 1 SRIOV VF
+for Physical Function 0
+
+```
+# lspci -d 177d:9702
+
+05:00.0 Ethernet controller: Cavium, Inc. CN23XX [LiquidIO II] Intelligent Adapter (rev 02)
+05:00.1 Ethernet controller: Cavium, Inc. CN23XX [LiquidIO II] Intelligent Adapter (rev 02)
+
+# echo 1 > /sys/bus/pci/devices/0000\:05\:00.0/sriov_numvfs
+```
+
+This will enable 1 VF for PF0 which will be attached to Qemu as a PCI device
+
+```
+# lspci -d 177d:9712
+
+05:00.3 Ethernet controller: Cavium, Inc. CN23XX [LiquidIO II] SRIOV Virtual Function (rev 02)
+```
+
+### Establish communication between DUT and OVS Control Plane on NIC
+
+The OVS control plane running on the NIC listens for incoming requests on a link local IP
+169.254.1.1. This address is reachable from DUT using standard network access mechanisms.
+
+To establish communication with the OVS control plane running on the NIC, we'll open a
+channel using the DUT PF network interfaces. We'll first create a macvlan from both PF interfaces and
+then bond those macvlan interfaces. The resulting bond interface, called `lio-bond-mgmt` in this
+example, will be assigned with a Link Local IP 169.254.1.2. 
+
+For this example, the physical interfaces in DUT are p3p1 and p3p2. These names may differ depending upon
+udev rules in your system and physical slot in which the NIC is inserted.
+
+```
+# PF0=p3p1
+# PF1=p3p2
+# LIO_BOND_MGMT=lio-bond-mgmt
+# LIO_MACVLAN_PF0=lio-mcvlan0
+# LIO_MACVLAN_PF1=lio-mcvlan1
+
+# LIO_HOST_MGMT_IP4_ADDR="169.254.1.2"
+# LIO_MGMT_IP4_ADDR="169.254.1.1"
+# LIO_MGMT_IP4_MASK=16
+
+# modprobe bonding
+# ip link set $PF0 up
+# ip link set $PF1 up
+# ip link add $LIO_MACVLAN_PF0 link $PF0 type macvlan
+# ip link add $LIO_MACVLAN_PF1 link $PF1 type macvlan
+
+# ip link add $LIO_BOND_MGMT type bond
+# echo balance-rr > /sys/class/net/$LIO_BOND_MGMT/bonding/mode
+# ip link set $LIO_MACVLAN_PF0 master $LIO_BOND_MGMT
+# ip link set $LIO_MACVLAN_PF1 master $LIO_BOND_MGMT
+
+# ip addr add $LIO_HOST_MGMT_IP4_ADDR/$LIO_MGMT_IP4_MASK dev $LIO_BOND_MGMT
+# ip link set $LIO_BOND_MGMT up
+```
+
+A quick test with ping after the above steps should confirm that DUT can reach the network stack within the adapter.
+
+```
+# ping -q 169.254.1.1 -c 1
+
+PING 169.254.1.1 (169.254.1.1) 56(84) bytes of data.
+
+--- 169.254.1.1 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 0.101/0.101/0.101/0.000 ms
+```
+
+### Create dummy ovs-* binaries
+
+Using the lio-bond-mgmt interface created above, we will redirect all OVS commands from remote tester machine
+to OVS control plane running on NIC.
+
+Create a directory in DUT under /tmp/ to hold our dummy binaries:
+
+```
+# mkdir -p /tmp/ovs-bin/
+```
+
+Create ovs-vswitchd file in /tmp/ovs-bin and write below commands to it so that all
+ovs commands will be sent to the OVS control plane on the NIC via ssh.
+
+```
+#!/bin/bash
+sshpass -p <NIC-PASSWORD> ssh root@169.254.1.1 "sh -l -c \"$(basename $0) $@\""
+
+Where, NIC-PASSWORD is the root password to access the NIC control plane. Please check with Cavium support to obtain the 
+password for your NIC.
+```
+
+Create a link for all ovs-* binaries to the new ovs-vswitchd:
+
+```
+# cd /tmp/ovs-bin
+# ln -sf ovs-vswitchd ovs-vsctl
+# ln -sf ovs-vswitchd ovs-ofctl
+# ln -sf ovs-vswitchd ovs-appctl
+# ln -sf ovs-vswitchd ovs-dpctl
+
+# chmod +x ovs-vswitchd
+```
+
+Update ~/.bashrc to include /tmp/ovs-bin in its path
+
+```
+# echo "export PATH=/tmp/ovs-bin/:\$PATH" >> ~/.bashrc
+# source ~/.bashrc
+```
+
+### Finding Physical and Virtual interfaces for test
+
+OVS control plane running on the NIC has a virtual interface corresponding to each Physical
+and Virtual function on DUT. These virtual interfaces are used for all OVS operations within the NIC.
+
+Following is the naming convention followed:
+
+__Physial Functions__: Each physical interface is named as `ethN`, N=0/1, depending upon the physical port being used.  
+  For this example, we'll pass `--physical-interface eth0` as parameter to ovs_performance.py.
+
+__Virtual Functions__: Each  virtual interface is named as `enp`$BUS`s`$DEV`f`$FUNC`, where BUS,DEV and FUNC are PCI Bus, Device and Function
+  for that interface.
+
+To get the network interface belonging to a specific virtual PCI function:
+
+Get the PCI ID for VF:
+
+```
+# lspci -d 177d:9712
+05:00.3 Ethernet controller: Cavium, Inc. CN23XX [LiquidIO II] SRIOV Virtual Function (rev 02)
+
+This command showss the BUS-DEV-FUNC for the VF device as 5-0-3
+```
+
+Using the BUS-DEV-FUNC shown above, the corresponding VF inteface used for OVS bridge is `enp5s0f3`.
+
+We'll pass `--virtual-interface enp5s0f3` as parameter to ovs_performance.py
+
+### Create OVS bridge within NIC
+
+In this example, we'll create the bridge ovs_pvp_br0 and attach a physical
+network device eth0 and virtual network device enp5s0f3 to it.
+
+```
+ovs-vsctl --if-exists del-br ovs_pvp_br0
+ovs-vsctl add-br ovs_pvp_br0
+ovs-vsctl add-port ovs_pvp_br0 eth0
+ovs-vsctl add-port ovs_pvp_br0 enp5s0f3
+```
+
+
+### Create the loopback Virtual Machine
+
+Follow the [_Create the loopback Virtual Machine_](#CreateLoopbackVM) section
+above, however, replace the _virt-install_ command with the following one:
+
+```
+# virt-install --connect=qemu:///system \
+  --network none \
+  --host-device 05:00.3,driver_name=vfio \
+  --network network=default \
+  --name=rhel_loopback_cpdpoffload \
+  --disk path=/opt/images/rhel-server-7.4-x86_64-kvm.qcow2,format=qcow2 \
+  --ram 8192 \
+  --vcpus=4,cpuset=3,4,5,6 \
+  --check-cpu \
+  --cpu Haswell-noTSX,+pdpe1gb,cell0.id=0,cell0.cpus=0,cell0.memory=8388608 \
+  --numatune mode=strict,nodeset=0 \
+  --nographics --noautoconsole \
+  --import \
+  --os-variant=rhel7
+```
+
+__NOTE__: The PCI address is that of the Virtual Function exposed by the network
+card!
+
+In addition the initial boot configuration needs to change due to the interface
+and name change:
+
+```
+# LIBGUESTFS_BACKEND=direct virt-customize -d rhel_loopback_cpdpoffload \
+  --root-password password:root \
+  --firstboot-command 'rm /etc/systemd/system/multi-user.target.wants/cloud-config.service' \
+  --firstboot-command 'rm /etc/systemd/system/multi-user.target.wants/cloud-final.service' \
+  --firstboot-command 'rm /etc/systemd/system/multi-user.target.wants/cloud-init-local.service' \
+  --firstboot-command 'rm /etc/systemd/system/multi-user.target.wants/cloud-init.service' \
+  --firstboot-command 'nmcli c | grep -o --  "[0-9a-fA-F]\{8\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{12\}" | xargs -n 1 nmcli c delete uuid' \
+  --firstboot-command 'nmcli con add con-name ovs-vf ifname eth0 type ethernet ip4 1.1.1.1/24' \
+  --firstboot-command 'nmcli con add con-name management ifname eth1 type ethernet' \
+  --firstboot-command 'reboot'
+```
+
+Now follow the rest of the [_Create the loopback Virtual Machine_](#CreateLoopbackVM)
+steps. With the exception of the ```driverctl -v set-override 0000:00:02.0 vfio-pci``` command,
+which should now become ```driverctl -v set-override 0000:00:09.0 vfio-pci```
+
+For testing with testpmd, you need to change the PCI address and the number of
+receive and transmit queues:
+
+```
+testpmd -c 0x7 -n 4 --socket-mem 1024,0 -w 0000:00:09.0 -- \
+  --burst 64 --disable-hw-vlan -i --rxq=1 --txq=1 \
+  --rxd=512 --txd=512 --coremask=0x6 --auto-start \
+  --port-topology=chained
+```
+
+### Running the PVP script
+
+When running the PVP script you should execute it with the following parameters:
+
+```
+# ~/ovs_perf/ovs_performance.py \
+  -d -l testrun_log.txt \              # Enable script debugging, and save the output to testrun_log.txt
+  --tester-type trex \                 # Set tester type to TRex
+  --tester-address localhost \         # IP address of the TRex server
+  --tester-interface 0 \               # Interface number used on the TRex
+  --ovs-address 10.19.17.133 \         # DUT IP address
+  --ovs-user root \                    # DUT login user name
+  --ovs-password root \                # DUT login user password
+  --dut-vm-address 192.168.122.39 \    # Address on which the VM is reachable, see above
+  --dut-vm-user root \                 # VM login user name
+  --dut-vm-password root \             # VM login user password
+  --dut-vm-nic-queues=1 \              # Number of rx/tx queues to use on the VM
+  --physical-interface eth0 \          # OVS Physical interface, i.e. connected to TRex
+  --virtual-interface enp5s0f3 \       # OVS Virtual interface, i.e. connected to the VM
+  --dut-vm-nic-pci=0000:00:09.0 \      # PCI address of the interface in the VM
+  --packet-list=64 \                   # Comma separated list of packets to test with
+  --stream-list=1000 \                 # Comma separated list of number of flows/streams to test with
+  --no-bridge-config \                 # Do not configure the OVS bridge, assume it's already done (see above)
+  --dut-vm-nic-txd=512 \               # Use 512 TX descriptors
+  --dut-vm-nic-rxd=512 \               # Use 512 RX descriptors
+  --skip-pv-test                       # Skip the Physical to Virtual test
+```
 
 ## Open vSwitch with Linux Kernel Datapath and TC Flower offload
 
