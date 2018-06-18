@@ -1515,8 +1515,187 @@ __NOTE__: This section does not go over any additional tuning that can be done
 for the kernel datapath.
 
 
-## Test with Open vSwitch running on the NIC
+## Open vSwitch with Linux Kernel Datapath and TC Flower offload
 
+Following the documentation from [here](#DUTsetup), however, make sure you use
+a kernel and Open vSwitch version that supports TC flower offload with your
+hardware.
+
+
+Follow it till the _Tweak the system for OVS-DPDK and Qemu usage_ section
+however in this section skip the huge pages configuration (not the iommu part!),
+and only isolate the cores needed for the Virtual Machine. In the example above
+3, 4, 5, 6, 7 and their hyper-threading pairs 17, 18, 19, 20, 21. This will
+isolate the VM CPUs from the system.
+
+
+### Setup Open vSwitch
+
+In this example setup, we use a Netronome NFP Ethernet card. The first few
+steps, i.e. setting up the firmware, configuring the port representors, are
+vendor specific. So please consult your vendor's specific documentation on how
+to enabled TC Flower Hardware Offload.
+
+To select the correct firmware for the Netronome card we have to execute the
+following script:
+
+```
+#!/bin/bash
+APP=${1:-flower}
+FWDIR=${2:-/lib/firmware/netronome/}
+cd ${FWDIR}
+for FW in *.nffw; do
+  if [ -L ${FW} ]; then
+    ln -sf ${APP}/${FW} ${FW}
+  fi
+done
+```
+
+Because the driver gets loaded by the initramfs we need to update this also.
+We do this as follows:
+
+```
+dracut -f -v
+reboot
+```
+
+After the reboot confirm that the correct firmware is loaded, i.e.
+hw-tc-offload can be enabled:
+
+```
+$ ethtool -K p6p1 hw-tc-offload on
+$ ethtool -k p6p1 | grep hw-tc-offload
+hw-tc-offload: on
+```
+
+
+Now we need to enable VF's port representors, that will be used by Open vSwitch.
+Once again this is vendor specific, and for our card, we do the following to
+create one virtual function:
+
+```
+echo 1 > /sys/bus/pci/devices/0000:$(lspci -d 19ee:4000 | cut -d ' ' -f 1)/sriov_numvfs
+```
+
+To get both the _Physical port_ and _Virtual Function_ representor interface
+names do the following:
+
+```
+$ dmesg | grep nfp | grep Representor
+[   25.354255] nfp 0000:03:00.0: nfp: Phys Port 0 Representor(eth1) created
+[   25.362042] nfp 0000:03:00.0: nfp: PF0 Representor(eth2) created
+[ 1870.896603] nfp 0000:03:00.0: nfp: VF0 Representor(eth1) created
+```
+
+__NOTE__: udev naming rules might have renamed your interfaces! In our case
+the _Phys Port 0 Representor(eth1)_ was renamed to _enp3s0np0_.
+
+
+Start Open vSwitch, and automatically start it after every reboot:
+
+```
+systemctl enable openvswitch
+systemctl start openvswitch
+```
+
+For the Physical to Virtual back to Physical(PVP) test we only need one bridge
+with the two port representors. In addition, we have to enable hardware offload:
+
+
+```
+ovs-vsctl --if-exists del-br ovs_pvp_br0
+ovs-vsctl add-br ovs_pvp_br0
+ovs-vsctl add-port ovs_pvp_br0 enp3s0np0 -- \
+          set Interface enp3s0np0 ofport_request=1
+ovs-vsctl add-port ovs_pvp_br0 eth1 -- \
+          set Interface eth1 ofport_request=2
+ovs-vsctl set Open_vSwitch . other_config:hw-offload=true
+```
+
+
+### Create the loopback Virtual Machine
+
+Follow the [_Create the loopback Virtual Machine_](#CreateLoopbackVM) section
+above, however, replace the _virt-install_ command with the following one:
+
+```
+# virt-install --connect=qemu:///system \
+  --network none \
+  --host-device 03:08.0,driver_name=vfio \
+  --network network=default \
+  --name=rhel_loopback_tcflower \
+  --disk path=/opt/images/rhel-server-7.4-x86_64-kvm.qcow2,format=qcow2 \
+  --ram 8192 \
+  --vcpus=4,cpuset=3,4,5,6 \
+  --check-cpu \
+  --cpu Haswell-noTSX,+pdpe1gb,cell0.id=0,cell0.cpus=0,cell0.memory=8388608 \
+  --numatune mode=strict,nodeset=0 \
+  --nographics --noautoconsole \
+  --import \
+  --os-variant=rhel7
+```
+
+__NOTE__: The PCI address is that of the Virtual Function exposed by the network
+card!
+
+In addition, the initial boot configuration needs to change due to the interface
+and name change:
+
+```
+# LIBGUESTFS_BACKEND=direct virt-customize -d rhel_loopback_tcflower \
+  --root-password password:root \
+  --firstboot-command 'rm /etc/systemd/system/multi-user.target.wants/cloud-config.service' \
+  --firstboot-command 'rm /etc/systemd/system/multi-user.target.wants/cloud-final.service' \
+  --firstboot-command 'rm /etc/systemd/system/multi-user.target.wants/cloud-init-local.service' \
+  --firstboot-command 'rm /etc/systemd/system/multi-user.target.wants/cloud-init.service' \
+  --firstboot-command 'nmcli c | grep -o --  "[0-9a-fA-F]\{8\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{12\}" | xargs -n 1 nmcli c delete uuid' \
+  --firstboot-command 'nmcli con add con-name ovs-vf ifname eth0 type ethernet ip4 1.1.1.1/24' \
+  --firstboot-command 'nmcli con add con-name management ifname eth1 type ethernet' \
+  --firstboot-command 'reboot'
+```
+
+Now follow the rest of the [_Create the loopback Virtual Machine_](#CreateLoopbackVM)
+steps. With the exception of the ```driverctl -v set-override 0000:00:02.0 vfio-pci``` command,
+which should now become ```driverctl -v set-override 0000:00:06.0 vfio-pci```
+
+For testing with testpmd, you need to change the PCI address and the number of
+receive and transmit queues:
+
+```
+testpmd -c 0x7 -n 4 --socket-mem 1024,0 -w 0000:00:06.0 -- \
+  --burst 64 --disable-hw-vlan -i --rxq=1 --txq=1 \
+  --rxd=4096 --txd=1024 --coremask=0x6 --auto-start \
+  --port-topology=chained
+```
+
+
+### Running the PVP script
+
+When running the PVP script you should execute it with the following parameters:
+
+```
+# ~/ovs_perf/ovs_performance.py \
+  -d -l testrun_log.txt \              # Enable script debugging, and save the output to testrun_log.txt
+  --tester-type trex \                 # Set tester type to TRex
+  --tester-address localhost \         # IP address of the TRex server
+  --tester-interface 0 \               # Interface number used on the TRex
+  --ovs-address 10.19.17.133 \         # DUT IP address
+  --ovs-user root \                    # DUT login user name
+  --ovs-password root \                # DUT login user password
+  --dut-vm-address 192.168.122.5 \     # Address on which the VM is reachable, see above
+  --dut-vm-user root \                 # VM login user name
+  --dut-vm-password root \             # VM login user password
+  --dut-vm-nic-queues=1 \              # Number of rx/tx queues to use on the VM
+  --physical-interface enp3s0np0 \     # OVS Physical interface, i.e. connected to TRex
+  --virtual-interface eth1 \           # OVS Virtual interface, i.e. connected to the VM
+  --dut-vm-nic-pci=0000:00:06.0 \      # PCI address of the interface in the VM
+  --packet-list=64 \                   # Comma separated list of packets to test with
+  --stream-list=1000 \                 # Comma separated list of number of flows/streams to test with
+  --no-bridge-config \                 # Do not configure the OVS bridge, assume it's already done (see above)
+  --skip-pv-test                       # Skip the Physical to Virtual test
+```
+
+## Test with Open vSwitch running on the NIC
 
 Offloading OVS entirely to a NIC requires the NIC to support execution of the control plane in addition to accelerating the data plane of OVS. We'll take the example of Cavium's LiquidIO-II SmartNIC
 adapter for this example.
@@ -1675,7 +1854,7 @@ Get the PCI ID for VF:
 This command shows the BUS-DEV-FUNC for the VF device as 5-0-3:
 ```
 
-Using the BUS-DEV-FUNC shown above, the corresponding VF inteface used for OVS bridge is `enp5s0f3`.
+Using the BUS-DEV-FUNC shown above, the corresponding VF interface used for OVS bridge is `enp5s0f3`.
 
 We'll pass `--virtual-interface enp5s0f3` as parameter to ovs_performance.py
 
@@ -1772,185 +1951,5 @@ When running the PVP script you should execute it with the following parameters:
   --no-bridge-config \                 # Do not configure the OVS bridge, assume it's already done (see above)
   --dut-vm-nic-txd=512 \               # Use 512 TX descriptors
   --dut-vm-nic-rxd=512 \               # Use 512 RX descriptors
-  --skip-pv-test                       # Skip the Physical to Virtual test
-```
-
-## Open vSwitch with Linux Kernel Datapath and TC Flower offload
-
-Following the documentation from [here](#DUTsetup), however, make sure you use
-a kernel and Open vSwitch version that supports TC flower offload with your
-hardware.
-
-
-Follow it till the _Tweak the system for OVS-DPDK and Qemu usage_ section
-however in this section skip the huge pages configuration (not the iommu part!),
-and only isolate the cores needed for the Virtual Machine. In the example above
-3, 4, 5, 6, 7 and their hyper-threading pairs 17, 18, 19, 20, 21. This will
-isolate the VM CPUs from the system.
-
-
-### Setup Open vSwitch
-
-In this example setup, we use a Netronome NFP Ethernet card. The first few
-steps, i.e. setting up the firmware, configuring the port representors, are
-vendor specific. So please consult your vendor's specific documentation on how
-to enabled TC Flower Hardware Offload.
-
-To select the correct firmware for the Netronome card we have to execute the
-following script:
-
-```
-#!/bin/bash
-APP=${1:-flower}
-FWDIR=${2:-/lib/firmware/netronome/}
-cd ${FWDIR}
-for FW in *.nffw; do
-  if [ -L ${FW} ]; then
-    ln -sf ${APP}/${FW} ${FW}
-  fi
-done
-```
-
-Because the driver gets loaded by the initramfs we need to update this also.
-We do this as follows:
-
-```
-dracut -f -v
-reboot
-```
-
-After the reboot confirm that the correct firmware is loaded, i.e.
-hw-tc-offload can be enabled:
-
-```
-$ ethtool -K p6p1 hw-tc-offload on
-$ ethtool -k p6p1 | grep hw-tc-offload
-hw-tc-offload: on
-```
-
-
-Now we need to enable VF's port representors, that will be used by Open vSwitch.
-Once again this is vendor specific, and for our card, we do the following to
-create one virtual function:
-
-```
-echo 1 > /sys/bus/pci/devices/0000:$(lspci -d 19ee:4000 | cut -d ' ' -f 1)/sriov_numvfs
-```
-
-To get both the _Physical port_ and _Virtual Function_ representor interface
-names do the following:
-
-```
-$ dmesg | grep nfp | grep Representor
-[   25.354255] nfp 0000:03:00.0: nfp: Phys Port 0 Representor(eth1) created
-[   25.362042] nfp 0000:03:00.0: nfp: PF0 Representor(eth2) created
-[ 1870.896603] nfp 0000:03:00.0: nfp: VF0 Representor(eth1) created
-```
-
-__NOTE__: udev naming rules might have renamed your interfaces! In our case
-the _Phys Port 0 Representor(eth1)_ was renamed to _enp3s0np0_.
-
-
-Start Open vSwitch, and automatically start it after every reboot:
-
-```
-systemctl enable openvswitch
-systemctl start openvswitch
-```
-
-For the Physical to Virtual back to Physical(PVP) test we only need one bridge
-with the two port representors. In addition, we have to enable hardware offload:
-
-
-```
-ovs-vsctl --if-exists del-br ovs_pvp_br0
-ovs-vsctl add-br ovs_pvp_br0
-ovs-vsctl add-port ovs_pvp_br0 enp3s0np0 -- \
-          set Interface enp3s0np0 ofport_request=1
-ovs-vsctl add-port ovs_pvp_br0 eth1 -- \
-          set Interface eth1 ofport_request=2
-ovs-vsctl set Open_vSwitch . other_config:hw-offload=true
-```
-
-
-### Create the loopback Virtual Machine
-
-Follow the [_Create the loopback Virtual Machine_](#CreateLoopbackVM) section
-above, however, replace the _virt-install_ command with the following one:
-
-```
-# virt-install --connect=qemu:///system \
-  --network none \
-  --host-device 03:08.0,driver_name=vfio \
-  --network network=default \
-  --name=rhel_loopback_tcflower \
-  --disk path=/opt/images/rhel-server-7.4-x86_64-kvm.qcow2,format=qcow2 \
-  --ram 8192 \
-  --vcpus=4,cpuset=3,4,5,6 \
-  --check-cpu \
-  --cpu Haswell-noTSX,+pdpe1gb,cell0.id=0,cell0.cpus=0,cell0.memory=8388608 \
-  --numatune mode=strict,nodeset=0 \
-  --nographics --noautoconsole \
-  --import \
-  --os-variant=rhel7
-```
-
-__NOTE__: The PCI address is that of the Virtual Function exposed by the network
-card!
-
-In addition the initial boot configuration needs to change due to the interface
-and name change:
-
-```
-# LIBGUESTFS_BACKEND=direct virt-customize -d rhel_loopback_tcflower \
-  --root-password password:root \
-  --firstboot-command 'rm /etc/systemd/system/multi-user.target.wants/cloud-config.service' \
-  --firstboot-command 'rm /etc/systemd/system/multi-user.target.wants/cloud-final.service' \
-  --firstboot-command 'rm /etc/systemd/system/multi-user.target.wants/cloud-init-local.service' \
-  --firstboot-command 'rm /etc/systemd/system/multi-user.target.wants/cloud-init.service' \
-  --firstboot-command 'nmcli c | grep -o --  "[0-9a-fA-F]\{8\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{12\}" | xargs -n 1 nmcli c delete uuid' \
-  --firstboot-command 'nmcli con add con-name ovs-vf ifname eth0 type ethernet ip4 1.1.1.1/24' \
-  --firstboot-command 'nmcli con add con-name management ifname eth1 type ethernet' \
-  --firstboot-command 'reboot'
-```
-
-Now follow the rest of the [_Create the loopback Virtual Machine_](#CreateLoopbackVM)
-steps. With the exception of the ```driverctl -v set-override 0000:00:02.0 vfio-pci``` command,
-which should now become ```driverctl -v set-override 0000:00:06.0 vfio-pci```
-
-For testing with testpmd, you need to change the PCI address and the number of
-receive and transmit queues:
-
-```
-testpmd -c 0x7 -n 4 --socket-mem 1024,0 -w 0000:00:06.0 -- \
-  --burst 64 --disable-hw-vlan -i --rxq=1 --txq=1 \
-  --rxd=4096 --txd=1024 --coremask=0x6 --auto-start \
-  --port-topology=chained
-```
-
-
-### Running the PVP script
-
-When running the PVP script you should execute it with the following parameters:
-
-```
-# ~/ovs_perf/ovs_performance.py \
-  -d -l testrun_log.txt \              # Enable script debugging, and save the output to testrun_log.txt
-  --tester-type trex \                 # Set tester type to TRex
-  --tester-address localhost \         # IP address of the TRex server
-  --tester-interface 0 \               # Interface number used on the TRex
-  --ovs-address 10.19.17.133 \         # DUT IP address
-  --ovs-user root \                    # DUT login user name
-  --ovs-password root \                # DUT login user password
-  --dut-vm-address 192.168.122.5 \     # Address on which the VM is reachable, see above
-  --dut-vm-user root \                 # VM login user name
-  --dut-vm-password root \             # VM login user password
-  --dut-vm-nic-queues=1 \              # Number of rx/tx queues to use on the VM
-  --physical-interface enp3s0np0 \     # OVS Physical interface, i.e. connected to TRex
-  --virtual-interface eth1 \           # OVS Virtual interface, i.e. connected to the VM
-  --dut-vm-nic-pci=0000:00:06.0 \      # PCI address of the interface in the VM
-  --packet-list=64 \                   # Comma separated list of packets to test with
-  --stream-list=1000 \                 # Comma separated list of number of flows/streams to test with
-  --no-bridge-config \                 # Do not configure the OVS bridge, assume it's already done (see above)
   --skip-pv-test                       # Skip the Physical to Virtual test
 ```
