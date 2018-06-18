@@ -1515,7 +1515,7 @@ __NOTE__: This section does not go over any additional tuning that can be done
 for the kernel datapath.
 
 
-## Test with Open vSwitch full offload (data and control path) to NIC
+## Test with Open vSwitch running on the NIC
 
 
 Offloading OVS entirely to a NIC requires the NIC to support execution of the control plane in addition to accelerating the data plane of OVS. We'll take the example of Cavium's LiquidIO-II SmartNIC
@@ -1533,14 +1533,14 @@ must be stopped in the host server (DUT).
 ```
 
 To allow full offload of OVS to LiquidIO-II adapter, the liquidio driver kernel module must be configured
-to use the appropriate firmware
+to use the appropriate firmware:
 
 ```
 modprobe liquidio fw_type=vsw
 ```
 
 Now, let's enable the SRIOV Virtual functions for the LiquidIO-II adapter. For this example, we'll enable 1 SRIOV VF
-for Physical Function 0
+for Physical Function 0:
 
 ```
 # lspci -d 177d:9702
@@ -1551,7 +1551,7 @@ for Physical Function 0
 # echo 1 > /sys/bus/pci/devices/0000\:05\:00.0/sriov_numvfs
 ```
 
-This will enable 1 VF for PF0 which will be attached to Qemu as a PCI device
+This will enable 1 VF for PF0 which will be attached to Qemu as a PCI device:
 
 ```
 # lspci -d 177d:9712
@@ -1559,7 +1559,7 @@ This will enable 1 VF for PF0 which will be attached to Qemu as a PCI device
 05:00.3 Ethernet controller: Cavium, Inc. CN23XX [LiquidIO II] SRIOV Virtual Function (rev 02)
 ```
 
-### Establish communication between DUT and OVS Control Plane on NIC
+### Establish communication between the DUT and OVS Control Plane on the NIC
 
 The OVS control plane running on the NIC listens for incoming requests on a link local IP
 169.254.1.1. This address is reachable from DUT using standard network access mechanisms.
@@ -1644,7 +1644,7 @@ Create a link for all ovs-* binaries to the new ovs-vswitchd:
 # chmod +x ovs-vswitchd
 ```
 
-Update ~/.bashrc to include /tmp/ovs-bin in its path
+Update ~/.bashrc to include /tmp/ovs-bin in its path:
 
 ```
 # echo "export PATH=/tmp/ovs-bin/:\$PATH" >> ~/.bashrc
@@ -1656,7 +1656,7 @@ Update ~/.bashrc to include /tmp/ovs-bin in its path
 OVS control plane running on the NIC has a virtual interface corresponding to each Physical
 and Virtual function on DUT. These virtual interfaces are used for all OVS operations within the NIC.
 
-Following is the naming convention followed:
+The naming convention is as follows:
 
 __Physial Functions__: Each physical interface is named as `ethN`, N=0/1, depending upon the physical port being used.  
   For this example, we'll pass `--physical-interface eth0` as parameter to ovs_performance.py.
@@ -1672,7 +1672,7 @@ Get the PCI ID for VF:
 # lspci -d 177d:9712
 05:00.3 Ethernet controller: Cavium, Inc. CN23XX [LiquidIO II] SRIOV Virtual Function (rev 02)
 
-This command showss the BUS-DEV-FUNC for the VF device as 5-0-3
+This command shows the BUS-DEV-FUNC for the VF device as 5-0-3:
 ```
 
 Using the BUS-DEV-FUNC shown above, the corresponding VF inteface used for OVS bridge is `enp5s0f3`.
