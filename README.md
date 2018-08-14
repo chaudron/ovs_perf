@@ -507,17 +507,17 @@ ovs-vsctl add-port ovs_pvp_br0 vhost0 -- \
 ### Create the loopback Virtual Machine
 <a name="CreateLoopbackVM"/>
 
-Get the [Red Hat Enterprise Linux 7.4 KVM Guest Image](https://access.redhat.com/downloads/content/69/ver=/rhel---7/7.4/x86_64/product-software).
+Get the [Red Hat Enterprise Linux 7.5 KVM Guest Image](https://access.redhat.com/downloads/content/69/ver=/rhel---7/7.5/x86_64/product-software).
 If you do not have access to the image please contact your Red Had
 representative. Copy the image for use by qemu:
 
 ```
 # ls -l ~/*.qcow2
--rw-r--r--. 1 root root 556247552 Jul 13 06:10 rhel-server-7.4-x86_64-kvm.qcow2
+-rw-r--r--. 1 root root 556247552 Jul 13 06:10 rhel-server-7.5-x86_64-kvm.qcow2
 ```
 ```
 mkdir -p /opt/images
-cp ~/rhel-server-7.4-x86_64-kvm.qcow2 /opt/images
+cp ~/rhel-server-7.5-x86_64-kvm.qcow2 /opt/images
 ```
 
 
@@ -536,7 +536,7 @@ Setup as much as possible with a single call to _virt-install_:
   --network vhostuser,source_type=unix,source_path=/tmp/vhost-sock0,source_mode=server,model=virtio,driver_queues=2 \
   --network network=default \
   --name=rhel_loopback \
-  --disk path=/opt/images/rhel-server-7.4-x86_64-kvm.qcow2,format=qcow2 \
+  --disk path=/opt/images/rhel-server-7.5-x86_64-kvm.qcow2,format=qcow2 \
   --ram 8192 \
   --memorybacking hugepages=on,size=1024,unit=M,nodeset=0 \
   --vcpus=4,cpuset=3,4,5,6 \
@@ -1624,7 +1624,7 @@ above, however, replace the _virt-install_ command with the following one:
   --host-device 03:08.0,driver_name=vfio \
   --network network=default \
   --name=rhel_loopback_tcflower \
-  --disk path=/opt/images/rhel-server-7.4-x86_64-kvm.qcow2,format=qcow2 \
+  --disk path=/opt/images/rhel-server-7.5-x86_64-kvm.qcow2,format=qcow2 \
   --ram 8192 \
   --vcpus=4,cpuset=3,4,5,6 \
   --check-cpu \
@@ -1882,7 +1882,7 @@ above, however, replace the _virt-install_ command with the following one:
   --host-device 05:00.3,driver_name=vfio \
   --network network=default \
   --name=rhel_loopback_cpdpoffload \
-  --disk path=/opt/images/rhel-server-7.4-x86_64-kvm.qcow2,format=qcow2 \
+  --disk path=/opt/images/rhel-server-7.5-x86_64-kvm.qcow2,format=qcow2 \
   --ram 8192 \
   --vcpus=4,cpuset=3,4,5,6 \
   --check-cpu \
