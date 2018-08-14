@@ -635,9 +635,10 @@ section above:
 [root@localhost ~]# subscription-manager register
 [root@localhost ~]# subscription-manager attach --pool=xxxxxxxxxxxxxxxxxxxxxxxxx
 [root@localhost ~]# subscription-manager repos --enable=rhel-7-fast-datapath-rpms
+[root@localhost ~]# subscription-manager repos --enable=rhel-7-server-extras-rpms
 [root@localhost ~]# yum -y clean all
 [root@localhost ~]# yum -y update
-[root@localhost ~]# yum -y install driverctl gcc kernel-devel numactl-devel tuned-profiles-cpu-partitioning wget
+[root@localhost ~]# yum -y install driverctl gcc kernel-devel numactl-devel tuned-profiles-cpu-partitioning wget libibverbs dpdk
 [root@localhost ~]# yum -y update kernel
 [root@localhost ~]# sed -i -e 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="isolcpus=1,2,3 default_hugepagesz=1G hugepagesz=1G hugepages=2 /'  /etc/default/grub
 [root@localhost ~]# grub2-mkconfig -o /boot/grub2/grub.cfg
@@ -662,26 +663,12 @@ subscription-manager repos \
 --enable="rhel-7-fast-datapath-rpms"
 ```
 
-
-We need the _testpmd_ tool from DPDK on this VM. As an exercise we build it
-from source:
-
-```
-[root@localhost ~]# cd ~
-[root@localhost ~]# wget http://fast.dpdk.org/rel/dpdk-17.08.tar.xz
-[root@localhost ~]# tar xf dpdk-17.08.tar.xz
-[root@localhost ~]# cd dpdk-17.08
-[root@localhost dpdk-17.08]# make install T=x86_64-native-linuxapp-gcc DESTDIR=_install
-[root@localhost dpdk-17.08]# ln -s /root/dpdk-17.08/x86_64-native-linuxapp-gcc/app/testpmd /usr/bin/testpmd
-```
-
-You can quickly check if your VM is setup correctly by starting _testpmd_
-as follows:
+You can quickly check if your VM is setup correctly by starting _testpmd_ as
+follows:
 
 ```
-[root@localhost dpdk-17.08]# cd ~
 [root@localhost dpdk-17.08]# testpmd -c 0x7 -n 4 --socket-mem 1024,0 -w 0000:00:02.0 -- \
-  --burst 64 --disable-hw-vlan -i --rxq=2 --txq=2 \
+  --burst 64 -i --rxq=2 --txq=2 \
   --rxd=4096 --txd=1024 --coremask=0x6 --auto-start \
   --port-topology=chained
 
@@ -1663,7 +1650,7 @@ receive and transmit queues:
 
 ```
 testpmd -c 0x7 -n 4 --socket-mem 1024,0 -w 0000:00:06.0 -- \
-  --burst 64 --disable-hw-vlan -i --rxq=1 --txq=1 \
+  --burst 64 -i --rxq=1 --txq=1 \
   --rxd=4096 --txd=1024 --coremask=0x6 --auto-start \
   --port-topology=chained
 ```
@@ -1921,7 +1908,7 @@ receive and transmit queues:
 
 ```
 testpmd -c 0x7 -n 4 --socket-mem 1024,0 -w 0000:00:09.0 -- \
-  --burst 64 --disable-hw-vlan -i --rxq=1 --txq=1 \
+  --burst 64 -i --rxq=1 --txq=1 \
   --rxd=512 --txd=512 --coremask=0x6 --auto-start \
   --port-topology=chained
 ```
