@@ -65,8 +65,8 @@ Now we can install the packages we need:
 ```
 yum -y clean all
 yum -y update
-yum -y install lshw emacs gcc git pciutils python-devel python-setuptools python-pip \
-               tmux tuned-profiles-cpu-partitioning wget
+yum -y install bc emacs gcc git lshw pciutils python-devel python-pip \
+               python-setuptools tmux tuned-profiles-cpu-partitioning wget
 ```
 
 
@@ -520,6 +520,15 @@ mkdir -p /opt/images
 cp ~/rhel-server-7.5-x86_64-kvm.qcow2 /opt/images
 ```
 
+If you are running Open vSwitch version 2.9 or later it will be started as
+non-root. For the virtual machines to work you need to make sure the
+_qemu_ ```group``` configuration is set to ```hugetlbfs```. If not done the
+below ```virt-install``` command will hang. This can be done with the following
+command:
+
+```
+sed -i -e 's/#group = "root"/group = "hugetlbfs"/' /etc/libvirt/qemu.conf
+```
 
 Start and enable libvirtd:
 
@@ -1516,7 +1525,7 @@ and only isolate the cores needed for the Virtual Machine. In the example above
 isolate the VM CPUs from the system.
 
 
-### Setup Open vSwitch
+### Setup Open vSwitch with a Netronome NIC
 
 In this example setup, we use a Netronome NFP Ethernet card. The first few
 steps, i.e. setting up the firmware, configuring the port representors, are
@@ -1599,11 +1608,143 @@ ovs-vsctl add-port ovs_pvp_br0 eth1 -- \
 ovs-vsctl set Open_vSwitch . other_config:hw-offload=true
 ```
 
+### Setup Open vSwitch with a Mellanox NIC
+
+In this example setup, we use a Mellanox ConnectX-5 Ex card. The first few
+steps, i.e. configuring the port representors, are vendor specific. So please
+consult your vendor's specific documentation on how to enabled TC Flower
+Hardware Offload.
+
+
+Confirm that the latest firmware is loaded, and enable hw-tc-offload:
+
+```
+$ ethtool -i p2p1 | head -5
+driver: mlx5_core
+version: 5.0-0
+firmware-version: 16.23.1020 (MT_0000000013)
+expansion-rom-version: 
+bus-info: 0000:65:00.0
+
+$ ethtool -K p2p1 hw-tc-offload on
+$ ethtool -k p2p1 | grep hw-tc-offload
+hw-tc-offload: on
+```
+__NOTE__: Make sure you run the latest version of the firmware so all rules are
+correctly offloaded.
+
+
+Now we need to enable VF's port representors, that will be used by Open vSwitch.
+Once again this is vendor specific, and for our card, we do the following to
+create one virtual function, with a specific MAC address:
+
+```
+$ ip link set p2p1 vf 0 mac 7c:11:22:33:44:50
+$ echo 1 > /sys/class/net/p2p1/device/sriov_numvfs
+```
+
+If SR-IOV can not be enabled, please check out the following article,
+[Configuring Mellanox mlx5 cards in Red Hat Enterprise Linux 7](https://access.redhat.com/articles/3082811)
+and execute the following command (on the correct PCI address):
+
+```
+$ mstconfig -d 65:00.0 set NUM_OF_VFS=4 SRIOV_EN=1
+
+Device #1:
+----------
+
+Device type:    ConnectX5
+Name:           N/A
+Description:    N/A
+Device:         65:00.0
+
+Configurations:                              Next Boot       New
+         NUM_OF_VFS                          4               4
+         SRIOV_EN                            True(1)         True(1)
+
+ Apply new Configuration? ? (y/n) [n] : y
+Applying... Done!
+-I- Please reboot machine to load new configurations.
+```
+
+Now you can verify the VF MAC:
+
+```
+$ ip link show dev p2p1
+4: p2p1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP mode DEFAULT group default qlen 1000
+    link/ether 24:8a:07:a5:28:48 brd ff:ff:ff:ff:ff:ff
+    vf 0 MAC 7c:11:22:33:44:50, spoof checking off, link-state auto, trust off, query_rss off
+```
+
+Change the e-switch mode from legacy to OVS offloads on the PF device:
+
+```
+$ lshw -c network -businfo
+Bus info          Device      Class          Description
+========================================================
+pci@0000:65:00.0  p2p1        network        MT28800 Family [ConnectX-5 Ex]
+pci@0000:65:00.1  p2p2        network        MT28800 Family [ConnectX-5 Ex]
+pci@0000:65:00.2  p2p1_0      network        MT27800 Family [ConnectX-5 Virtual Function]
+
+$ echo 0000:65:00.2 > /sys/bus/pci/drivers/mlx5_core/unbind
+
+$ devlink dev eswitch set pci/0000:65:00.0 mode switchdev
+
+$ echo 0000:65:00.2 > /sys/bus/pci/drivers/mlx5_core/bind
+```
+
+The physical port representor is just the physical port name, in our case ```p2p1```.
+To get the Virtual Function representor interface name match
+the switch ID from the physical port. The example below shows the VF
+representor is ```eth0```:
+
+```
+$ find /sys/class/net/*/phys_switch_id | xargs -i sh -c 'echo "{}"; cat {}'  2>/dev/null
+/sys/class/net/em1/phys_switch_id
+/sys/class/net/em2/phys_switch_id
+/sys/class/net/eth0/phys_switch_id
+248a07a52848
+/sys/class/net/lo/phys_switch_id
+/sys/class/net/p2p1_0/phys_switch_id
+/sys/class/net/p2p1/phys_switch_id
+248a07a52848
+/sys/class/net/p2p2/phys_switch_id
+/sys/class/net/virbr0-nic/phys_switch_id
+/sys/class/net/virbr0/phys_switch_id
+```
+
+Start Open vSwitch, and automatically start it after every reboot:
+
+```
+systemctl enable openvswitch
+systemctl start openvswitch
+```
+
+For the Physical to Virtual back to Physical(PVP) test we only need one bridge
+with the two port representors. In addition, we have to enable hardware offload:
+
+```
+ovs-vsctl --if-exists del-br ovs_pvp_br0
+ovs-vsctl add-br ovs_pvp_br0
+ovs-vsctl add-port ovs_pvp_br0 p2p1 -- \
+          set Interface p2p1 ofport_request=1
+ovs-vsctl add-port ovs_pvp_br0 eth0 -- \
+          set Interface eth0 ofport_request=2
+ovs-vsctl set Open_vSwitch . other_config:hw-offload=true
+```
+
 
 ### Create the loopback Virtual Machine
 
 Follow the [_Create the loopback Virtual Machine_](#CreateLoopbackVM) section
-above, however, replace the _virt-install_ command with the following one:
+above, however, make an additional copy of the VM image:
+
+```
+mkdir -p /opt/images
+cp ~/rhel-server-7.5-x86_64-kvm.qcow2 /opt/images/rhel-server-7.5-x86_64-kvm-tc.qcow2
+```
+
+and replace the _virt-install_ command with the following one:
 
 ```
 # virt-install --connect=qemu:///system \
@@ -1611,7 +1752,7 @@ above, however, replace the _virt-install_ command with the following one:
   --host-device 03:08.0,driver_name=vfio \
   --network network=default \
   --name=rhel_loopback_tcflower \
-  --disk path=/opt/images/rhel-server-7.5-x86_64-kvm.qcow2,format=qcow2 \
+  --disk path=/opt/images/rhel-server-7.5-x86_64-kvm-tc.qcow2,format=qcow2 \
   --ram 8192 \
   --vcpus=4,cpuset=3,4,5,6 \
   --check-cpu \
@@ -1644,6 +1785,10 @@ and name change:
 Now follow the rest of the [_Create the loopback Virtual Machine_](#CreateLoopbackVM)
 steps. With the exception of the ```driverctl -v set-override 0000:00:02.0 vfio-pci``` command,
 which should now become ```driverctl -v set-override 0000:00:06.0 vfio-pci```
+
+__NOTE__: For the Mellanox NICs the ```driverctl``` command should __NOT__ be
+used, as their kernel driver will take care of the unbinding.
+
 
 For testing with testpmd, you need to change the PCI address and the number of
 receive and transmit queues:
@@ -1733,7 +1878,7 @@ The OVS control plane running on the NIC listens for incoming requests on a link
 To establish communication with the OVS control plane running on the NIC, we'll open a
 channel using the DUT PF network interfaces. We'll first create a macvlan from both PF interfaces and
 then bond those macvlan interfaces. The resulting bond interface, called `lio-bond-mgmt` in this
-example, will be assigned with a Link Local IP 169.254.1.2. 
+example, will be assigned with a Link Local IP 169.254.1.2.
 
 For this example, the physical interfaces in DUT are p3p1 and p3p2. These names may differ depending upon
 udev rules in your system and physical slot in which the NIC is inserted.
@@ -1794,7 +1939,7 @@ ovs commands will be sent to the OVS control plane on the NIC via ssh.
 #!/bin/bash
 sshpass -p <NIC-PASSWORD> ssh root@169.254.1.1 "sh -l -c \"$(basename $0) $@\""
 
-Where, NIC-PASSWORD is the root password to access the NIC control plane. Please check with Cavium support to obtain the 
+Where, NIC-PASSWORD is the root password to access the NIC control plane. Please check with Cavium support to obtain the
 password for your NIC.
 ```
 
@@ -1824,7 +1969,7 @@ and Virtual function on DUT. These virtual interfaces are used for all OVS opera
 
 The naming convention is as follows:
 
-__Physial Functions__: Each physical interface is named as `ethN`, N=0/1, depending upon the physical port being used.  
+__Physial Functions__: Each physical interface is named as `ethN`, N=0/1, depending upon the physical port being used.
   For this example, we'll pass `--physical-interface eth0` as parameter to ovs_performance.py.
 
 __Virtual Functions__: Each  virtual interface is named as `enp`$BUS`s`$DEV`f`$FUNC`, where BUS,DEV and FUNC are PCI Bus, Device and Function
