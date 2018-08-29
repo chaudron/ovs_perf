@@ -855,8 +855,12 @@ def get_active_datapath_flows():
         cmd = 'sh -c "ovs-appctl dpctl/show netdev@ovs-netdev | ' \
               'grep flows | awk \'{print $2}\'"'
     else:
-        cmd = 'sh -c "ovs-appctl dpctl/show system@ovs-system | ' \
-              'grep flows | awk \'{print $2}\'"'
+        if ovs_tc_enabled:
+            cmd = 'sh -c "ovs-appctl dpctl/dump-flows system@ovs-system | ' \
+                  'wc -l"'
+        else:
+            cmd = 'sh -c "ovs-appctl dpctl/show system@ovs-system | ' \
+                  'grep flows | awk \'{print $2}\'"'
 
     result = dut_shell.dut_exec(cmd, die_on_error=True)
     return int(result.stdout_output)
@@ -2665,6 +2669,20 @@ def get_ovs_datapath():
 
 
 #
+# Check if TC is enabled
+#
+def get_tc_state():
+    result = dut_shell.dut_exec(
+        'sh -c "ovs-vsctl get Open_vSwitch . other_config:hw-offload"',
+        die_on_error=False)
+    output = result.output.replace("\n", "")
+    if output == '"true"':
+        return True
+
+    return False
+
+
+#
 # Get bridge MAC address
 #
 def get_of_bridge_mac_address(bridge):
@@ -2738,6 +2756,7 @@ def main():
     global slogger
     global of_interfaces
     global ovs_data_path
+    global ovs_tc_enabled
     global dp_interfaces
     global tester
     global phy_speed
@@ -3242,6 +3261,10 @@ def main():
     #
     ovs_data_path = get_ovs_datapath()
     lprint("- Get OVS datapath type, \"{}\"...".format(ovs_data_path))
+
+    ovs_tc_enabled = get_tc_state()
+    lprint("- Get TC state, \"{}\"...".format("enabled" if ovs_tc_enabled
+                                              else "disabled"))
 
     #
     # Open CSV file for writing
