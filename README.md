@@ -317,13 +317,13 @@ Now we can install the packages we need:
 yum -y clean all
 yum -y update
 yum -y install aspell aspell-en autoconf automake bc checkpolicy \
-               desktop-file-utils driverctl emacs gcc gcc-c++ gdb git graphviz \
-               groff hwloc intltool kernel-devel libcap-ng libcap-ng-devel \
-               libguestfs libguestfs-tools-c libtool libvirt lshw openssl \
-               openssl-devel openvswitch procps-ng python python-six \
-               python-twisted-core python-zope-interface qemu-kvm-rhev \
-               rpm-build selinux-policy-devel sshpass sysstat systemd-units \
-               tcpdump time tmux tuned-profiles-cpu-partitioning \
+               desktop-file-utils dpdk-tools driverctl emacs gcc gcc-c++ gdb \
+	       git graphviz groff hwloc intltool kernel-devel libcap-ng \
+	       libcap-ng-devel libguestfs libguestfs-tools-c libtool libvirt \
+	       lshw openssl openssl-devel openvswitch procps-ng python \
+	       python-six python-twisted-core python-zope-interface \
+	       qemu-kvm-rhev rpm-build selinux-policy-devel sshpass sysstat \
+	       systemd-units tcpdump time tmux tuned-profiles-cpu-partitioning \
                virt-install virt-manager wget
 ```
 
