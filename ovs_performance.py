@@ -234,179 +234,295 @@ def test_v2v(nr_of_flows, packet_sizes):
 
 
 #
+# Calculate loss percentage
+#
+def calc_loss_percentage(results):
+    return 100 - (float(results["total_rx_pkts"])
+                  / float(results["total_tx_pkts"])
+                  * 100)
+
+#
+# Get the NFV results for a single binary search iteration
+#
+def PVP_binary_search_single_run(test_value, **kwargs):
+    packet_size = kwargs.get("packet_size", 64)
+    nr_of_streams = kwargs.get("nr_of_streams", 10)
+
+    results = test_p2v2p_single_packet_size(nr_of_streams, packet_size,
+                                            decrease_rate=100 - test_value)
+
+    results["traffic_rate"] = test_value
+
+    lprint("  > Zero pkt loss: pkt {}, load {}%,  miss {:.6f}%".
+           format(packet_size, test_value,
+                  calc_loss_percentage(results)))
+
+    return results
+
+
+#
+# Run the NFV mobile tests for a binary search iteration
+#
+def PVP_binary_search_itteration_result(result_values, test_value, **kwargs):
+    return calc_loss_percentage(result_values[test_value])
+
+#
+# binary search to find the highest value where the results are less or equal
+# to the required_result.
+#
+# It will return all the data sets returned by the run_test_function,
+# and index which one is matching the above. -1 means it was not found!
+#
+def binary_search(min_value, max_value, required_result,
+                  run_test_function,
+                  get_results_function,
+                  **kwargs):
+    step = kwargs.pop("bs_step", 1)
+    results = dict()
+    #
+    # Need values from max to min, but in low to high order
+    #
+    values = np.arange(max_value, min_value-min(min_value, step), -step)
+    values = values[::-1]
+
+    if len(values) <= 1:
+        return results, -1
+
+    #
+    # Here we do a binary like search until the min and max values are one
+    # apart. When this happens we closed in to the highest possible value to
+    # get the results, or if both are not matching we can not achieve the
+    # requested.
+    #
+    current_min = 0
+    current_max = len(values) - 1
+
+    while True:
+        if current_min == current_max - 1:
+            break
+
+        current_test = current_min + ((current_max - current_min) / 2)
+
+        results[values[current_test]] = run_test_function(values[current_test],
+                                                          **kwargs)
+        result = get_results_function(results, values[current_test], **kwargs)
+        if result > required_result:
+            current_max = current_test
+        else:
+            current_min = current_test
+
+    if not values[current_max] in results:
+        results[values[current_max]] = run_test_function(values[current_max],
+                                                         **kwargs)
+
+    if get_results_function(results, values[current_max],
+                            **kwargs) <= required_result:
+        return results, values[current_max]
+
+    if not values[current_min] in results:
+        results[values[current_min]] = run_test_function(values[current_min],
+                                                         **kwargs)
+
+    if get_results_function(results, values[current_min],
+                            **kwargs) <= required_result:
+        return results, values[current_min]
+
+    return results, -1
+
+
+#
+# Run simple traffic test Physical to VM back to Physical
+#
+def test_p2v2p_single_packet_size(nr_of_flows, packet_size, **kwargs):
+
+    decrease_rate = kwargs.get("decrease_rate", 0)
+
+    assert (decrease_rate >= 0 or decrease_rate < 100)
+    decrease_rate *= 10000
+
+    results = dict()
+    warm_up_done = False
+
+    ##################################################
+    lprint("- [TEST: {0}(flows={1}, packet_size={2}, rate={3:.2f}%)] START".
+           format(inspect.currentframe().f_code.co_name,
+                  nr_of_flows, packet_size, (1000000 - decrease_rate) / 10000))
+
+    ##################################################
+    lprint("  * Create OVS OpenFlow rules...")
+
+    create_ovs_bidirectional_of_rules(nr_of_flows,
+                                      of_interfaces[config.physical_interface],
+                                      of_interfaces[config.virtual_interface])
+
+    ##################################################
+    lprint("  * Initializing packet generation...")
+    tester.configure_traffic_stream(config.tester_interface,
+                                    get_traffic_generator_flow(),
+                                    nr_of_flows, packet_size,
+                                    traffic_dst_mac=config.dst_mac_address,
+                                    traffic_src_mac=config.src_mac_address,
+                                    percentage=1000000 - decrease_rate)
+
+    ##################################################
+    if config.warm_up:
+        lprint("  * Doing flow table warm-up...")
+        start_vm_time = datetime.datetime.now()
+        start_traffic_loop_on_vm(config.dut_vm_address,
+                                 config.dut_vm_nic_pci)
+
+        tester.start_traffic(config.tester_interface)
+
+        warm_up_done = warm_up_verify(nr_of_flows * 2,
+                                      config.warm_up_timeout)
+        tester.stop_traffic(config.tester_interface)
+
+        if not warm_up_done:
+            if config.warm_up_no_fail:
+                stop_traffic_loop_on_vm(config.dut_vm_address)
+                flow_table_cool_down()
+            else:
+                sys.exit(-1)
+
+    ##################################################
+    lprint("  * Clear all statistics...")
+    tester.clear_statistics(config.tester_interface)
+
+    pp_tx_start, pp_tx_drop_start, pp_rx_start, pp_rx_drop_start \
+        = get_of_port_packet_stats(of_interfaces[config.physical_interface])
+    vp_tx_start, vp_tx_drop_start, vp_rx_start, vp_rx_drop_start \
+        = get_of_port_packet_stats(of_interfaces[config.virtual_interface])
+
+    ##################################################
+    if not config.warm_up or not warm_up_done:
+        lprint("  * Start packet receiver on VM...")
+        start_traffic_loop_on_vm(config.dut_vm_address,
+                                 config.dut_vm_nic_pci)
+        warm_up_time = 0
+    else:
+        # warm_up_time is the total time it takes from the start of the
+        # VM at warm-up till we would normally start the loop back VM.
+        # This values is used to remove warm-up statistics.
+        warm_up_time = int(np.ceil((datetime.datetime.now() -
+                                    start_vm_time).total_seconds()))
+        lprint("  * Determine warm op time, {} seconds...".
+               format(warm_up_time))
+
+    ##################################################
+    lprint("  * Start CPU monitoring on DUT...")
+    start_cpu_monitoring()
+
+    ##################################################
+    lprint("  * Start packet generation for {0} seconds...".format(config.run_time))
+    tester.start_traffic(config.tester_interface)
+    for i in range(1, config.run_time):
+        time.sleep(1)
+        tester.take_rx_statistics_snapshot(config.tester_interface)
+
+    ##################################################
+    lprint("  * Stop CPU monitoring on DUT...")
+    stop_cpu_monitoring()
+
+    ##################################################
+    lprint("  * Stopping packet stream...")
+    tester.stop_traffic(config.tester_interface)
+    time.sleep(1)
+
+    ##################################################
+    lprint("  * Stop packet receiver on VM...")
+    stop_traffic_loop_on_vm(config.dut_vm_address)
+
+    ##################################################
+    lprint("  * Gathering statistics...")
+
+    tester.take_statistics_snapshot(config.tester_interface)
+
+    full_tx_stats = tester.get_tx_statistics_snapshots(config.tester_interface)
+    full_rx_stats = tester.get_rx_statistics_snapshots(config.tester_interface)
+    slogger.debug(" full_tx_stats={}".format(full_tx_stats))
+    slogger.debug(" full_rx_stats={}".format(full_rx_stats))
+
+    pp_tx_end, pp_tx_drop_end, pp_rx_end, pp_rx_drop_end \
+        = get_of_port_packet_stats(of_interfaces[config.physical_interface])
+    vp_tx_end, vp_tx_drop_end, vp_rx_end, vp_rx_drop_end \
+        = get_of_port_packet_stats(of_interfaces[config.virtual_interface])
+
+    pp_rx = pp_rx_end - pp_rx_start
+    pp_tx = pp_tx_end - pp_tx_start
+    pp_rx_drop = pp_rx_drop_end - pp_rx_drop_start
+    pp_tx_drop = pp_tx_drop_end - pp_tx_drop_start
+
+    vp_rx = vp_rx_end - vp_rx_start
+    vp_tx = vp_tx_end - vp_tx_start
+    vp_rx_drop = vp_rx_drop_end - vp_rx_drop_start
+    vp_tx_drop = vp_tx_drop_end - vp_tx_drop_start
+
+    vm_pkts_sec = get_traffic_rx_stats_from_vm(config.dut_vm_address,
+                                               skip_samples=warm_up_time)
+
+    packets_tx = full_tx_stats[sorted(full_tx_stats.keys())[-1]]['pt_total']['packets']
+    packets_rx = full_rx_stats[sorted(full_rx_stats.keys())[-1]]['pr_total']['packets']
+
+    lprint("    - Packets send by Tester      : {:-20,}".format(packets_tx))
+
+    lprint("    - Packets received by physical: {:-20,} [Lost {:,}, Drop {:,}]".
+           format(pp_rx, packets_tx - pp_rx, pp_rx_drop))
+
+    lprint("    - Packets received by virtual : {:-20,} [Lost {:,}, Drop {:,}]".
+           format(vp_tx, pp_rx - vp_tx, vp_tx_drop))
+
+    lprint("    - Packets send by virtual     : {:-20,} [Lost {:,}, Drop {:,}]".
+           format(vp_rx, vp_tx - vp_rx, vp_rx_drop))
+
+    lprint("    - Packets send by physical    : {:-20,} [Lost {:,}, Drop {:,}]".
+           format(pp_tx, vp_rx - pp_tx, pp_tx_drop))
+
+    lprint("    - Packets received by Tester  : {:-20,} [Lost {:,}]".
+           format(packets_rx, pp_tx - packets_rx))
+
+    lprint("    - Receive rate on VM: {:,} pps".format(vm_pkts_sec))
+
+    rx_pkts_sec = get_packets_per_second_from_traffic_generator_rx_stats(full_rx_stats)
+    lprint("  ! Result, average: {:,} pps".format(rx_pkts_sec))
+
+    ##################################################
+    lprint("  * Restoring state for next test...")
+    tester.unconfigure_traffic_stream(config.tester_interface)
+
+    # dut_shell.dut_exec('sh -c "ovs-ofctl del-flows {0} && ovs-appctl dpctl/del-flows"'.\
+    #                    format(config.bridge_name),
+    #                    die_on_error=True)
+
+    ##################################################
+    lprint("- [TEST: {0}(flows={1}, packet_size={2})] END".
+           format(inspect.currentframe().f_code.co_name,
+                  nr_of_flows, packet_size))
+
+    results["cpu_stats"] = get_cpu_monitoring_stats()
+    results["rx_packets_second"] = rx_pkts_sec
+    results["total_tx_pkts"] = packets_tx
+    results["total_rx_pkts"] = packets_rx
+    return results
+
+
+#
 # Run simple traffic test Physical to VM back to Physical
 #
 def test_p2v2p(nr_of_flows, packet_sizes):
 
     p2v2p_results = list()
     cpu_results = list()
-    warm_up_done = False
 
     for packet_size in packet_sizes:
+        results = test_p2v2p_single_packet_size(nr_of_flows, packet_size)
 
-        ##################################################
-        lprint("- [TEST: {0}(flows={1}, packet_size={2})] START".
-               format(inspect.currentframe().f_code.co_name,
-                      nr_of_flows, packet_size))
-
-        ##################################################
-        lprint("  * Create OVS OpenFlow rules...")
-
-        create_ovs_bidirectional_of_rules(
-            nr_of_flows,
-            of_interfaces[config.physical_interface],
-            of_interfaces[config.virtual_interface])
-
-        ##################################################
-        lprint("  * Initializing packet generation...")
-        tester.configure_traffic_stream(config.tester_interface,
-                                        get_traffic_generator_flow(),
-                                        nr_of_flows, packet_size,
-                                        traffic_dst_mac=config.dst_mac_address,
-                                        traffic_src_mac=config.src_mac_address)
-
-        ##################################################
-        if config.warm_up:
-            lprint("  * Doing flow table warm-up...")
-            start_vm_time = datetime.datetime.now()
-            start_traffic_loop_on_vm(config.dut_vm_address,
-                                     config.dut_vm_nic_pci)
-
-            tester.start_traffic(config.tester_interface)
-
-            warm_up_done = warm_up_verify(nr_of_flows * 2,
-                                          config.warm_up_timeout)
-            tester.stop_traffic(config.tester_interface)
-
-            if not warm_up_done:
-                if config.warm_up_no_fail:
-
-                    stop_traffic_loop_on_vm(config.dut_vm_address)
-                    flow_table_cool_down()
-                else:
-                    sys.exit(-1)
-
-        ##################################################
-        lprint("  * Clear all statistics...")
-        tester.clear_statistics(config.tester_interface)
-
-        pp_tx_start, pp_tx_drop_start, pp_rx_start, pp_rx_drop_start \
-            = get_of_port_packet_stats(of_interfaces[config.physical_interface])
-        vp_tx_start, vp_tx_drop_start, vp_rx_start, vp_rx_drop_start \
-            = get_of_port_packet_stats(of_interfaces[config.virtual_interface])
-
-        ##################################################
-        if not config.warm_up or not warm_up_done:
-            lprint("  * Start packet receiver on VM...")
-            start_traffic_loop_on_vm(config.dut_vm_address,
-                                     config.dut_vm_nic_pci)
-            warm_up_time = 0
-        else:
-            # warm_up_time is the total time it takes from the start of the
-            # VM at warm-up till we would normally start the loop back VM.
-            # This values is used to remove warm-up statistics.
-            warm_up_time = int(np.ceil((datetime.datetime.now() -
-                                        start_vm_time).total_seconds()))
-            lprint("  * Determine warm op time, {} seconds...".
-                   format(warm_up_time))
-
-        ##################################################
-        lprint("  * Start CPU monitoring on DUT...")
-        start_cpu_monitoring()
-
-        ##################################################
-        lprint("  * Start packet generation for {0} seconds...".format(config.run_time))
-        tester.start_traffic(config.tester_interface)
-        for i in range(1, config.run_time):
-            time.sleep(1)
-            tester.take_rx_statistics_snapshot(config.tester_interface)
-
-        ##################################################
-        lprint("  * Stop CPU monitoring on DUT...")
-        stop_cpu_monitoring()
-
-        ##################################################
-        lprint("  * Stopping packet stream...")
-        tester.stop_traffic(config.tester_interface)
-        time.sleep(1)
-
-        ##################################################
-        lprint("  * Stop packet receiver on VM...")
-        stop_traffic_loop_on_vm(config.dut_vm_address)
-
-        ##################################################
-        lprint("  * Gathering statistics...")
-
-        tester.take_statistics_snapshot(config.tester_interface)
-
-        full_tx_stats = tester.get_tx_statistics_snapshots(config.tester_interface)
-        full_rx_stats = tester.get_rx_statistics_snapshots(config.tester_interface)
-        slogger.debug(" full_tx_stats={}".format(full_tx_stats))
-        slogger.debug(" full_rx_stats={}".format(full_rx_stats))
-
-        pp_tx_end, pp_tx_drop_end, pp_rx_end, pp_rx_drop_end \
-            = get_of_port_packet_stats(of_interfaces[config.physical_interface])
-        vp_tx_end, vp_tx_drop_end, vp_rx_end, vp_rx_drop_end \
-            = get_of_port_packet_stats(of_interfaces[config.virtual_interface])
-
-        pp_rx = pp_rx_end - pp_rx_start
-        pp_tx = pp_tx_end - pp_tx_start
-        pp_rx_drop = pp_rx_drop_end - pp_rx_drop_start
-        pp_tx_drop = pp_tx_drop_end - pp_tx_drop_start
-
-        vp_rx = vp_rx_end - vp_rx_start
-        vp_tx = vp_tx_end - vp_tx_start
-        vp_rx_drop = vp_rx_drop_end - vp_rx_drop_start
-        vp_tx_drop = vp_tx_drop_end - vp_tx_drop_start
-
-        vm_pkts_sec = get_traffic_rx_stats_from_vm(config.dut_vm_address,
-                                                   skip_samples=warm_up_time)
-
-        packets_tx = full_tx_stats[sorted(full_tx_stats.keys())[-1]]['pt_total']['packets']
-        packets_rx = full_rx_stats[sorted(full_rx_stats.keys())[-1]]['pr_total']['packets']
-
-        lprint("    - Packets send by Tester      : {:-20,}".format(packets_tx))
-
-        lprint("    - Packets received by physical: {:-20,} [Lost {:,}, Drop {:,}]".
-               format(pp_rx, packets_tx - pp_rx, pp_rx_drop))
-
-        lprint("    - Packets received by virtual : {:-20,} [Lost {:,}, Drop {:,}]".
-               format(vp_tx, pp_rx - vp_tx, vp_tx_drop))
-
-        lprint("    - Packets send by virtual     : {:-20,} [Lost {:,}, Drop {:,}]".
-               format(vp_rx, vp_tx - vp_rx, vp_rx_drop))
-
-        lprint("    - Packets send by physical    : {:-20,} [Lost {:,}, Drop {:,}]".
-               format(pp_tx, vp_rx - pp_tx, pp_tx_drop))
-
-        lprint("    - Packets received by Tester  : {:-20,} [Lost {:,}]".
-               format(packets_rx, pp_tx - packets_rx))
-
-        lprint("    - Receive rate on VM: {:,} pps".format(vm_pkts_sec))
-
-        rx_pkts_sec = get_packets_per_second_from_traffic_generator_rx_stats(full_rx_stats)
-        lprint("  ! Result, average: {:,} pps".format(rx_pkts_sec))
-
-        p2v2p_results.append(rx_pkts_sec)
-        cpu_results.append(get_cpu_monitoring_stats())
-
-        ##################################################
-        lprint("  * Restoring state for next test...")
-        tester.unconfigure_traffic_stream(config.tester_interface)
-
-        # dut_shell.dut_exec('sh -c "ovs-ofctl del-flows {0} && ovs-appctl dpctl/del-flows"'.\
-        #                    format(config.bridge_name),
-        #                    die_on_error=True)
-
-        ##################################################
-        lprint("- [TEST: {0}(flows={1}, packet_size={2})] END".
-               format(inspect.currentframe().f_code.co_name,
-                      nr_of_flows, packet_size))
+        cpu_results.append(results["cpu_stats"])
+        p2v2p_results.append(results["rx_packets_second"])
 
     create_single_graph(packet_sizes, p2v2p_results,
                         "Packet size", "Packets/second",
-                        "Physical to Virtual back to Physical with {} {} flows".
-                        format(nr_of_flows,  get_flow_type_short()),
+                        "Physical to Virtual back to Physical with {} {} "
+                        "flows".format(nr_of_flows,  get_flow_type_short()),
                         "test_p2v2p_{}_{}".format(nr_of_flows,
                                                   get_flow_type_name()),
                         phy_speed,
@@ -2519,6 +2635,7 @@ def stop_perf_recording():
     cmd = r"kill -s INT `pidof perf`"
     dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd], die_on_error=True)
 
+
 #
 # Start CPU monitoring on DUT
 #
@@ -2562,7 +2679,6 @@ def get_cpu_monitoring_stats():
 
     cmd = r"cat /var/tmp/cpu_mpstat.txt"
     results = dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd], die_on_error=True)
-    cpu_raw_stats = results.stdout_output
 
     cpu_usr = float(0)
     cpu_nice = float(0)
@@ -2808,10 +2924,10 @@ def main():
                         help="Number of VM nic transmit descriptors, default 1024",
                         type=int, default=1024)
     # Removed VV test for now, as it needs non-upstream trafgen tool
-    #parser.add_argument("--dut-second-vm-address", metavar="ADDRESS",
+    # parser.add_argument("--dut-second-vm-address", metavar="ADDRESS",
     #                    help="IP address of second VM running on OpenVSwitch DUT", type=str,
     #                    default=DEFAULT_DUT_SECOND_VM_ADDRESS)
-    #parser.add_argument("--dut-second-vm-nic-pci", metavar="PCI",
+    # parser.add_argument("--dut-second-vm-nic-pci", metavar="PCI",
     #                    help="PCI address of VMs virtual NIC", type=str,
     #                    default=DEFAULT_DUT_VM_NIC_PCI_ADDRESS)
     parser.add_argument("--flow-type",
@@ -2853,8 +2969,11 @@ def main():
                         default=DEFAULT_RUN_TIME)
     parser.add_argument("--run-pp-test",
                         help="Run the P to P test", action="store_true")
+    parser.add_argument("--run-pvp-zero-loss-test",
+                        help="Run the P to V to P test with zero packet loss",
+                        action="store_true")
     # Disable VXLAN for now due to it being incomplete
-    #parser.add_argument("--run-vxlan-test",
+    # parser.add_argument("--run-vxlan-test",
     #                    help="Run the VXLAN tunnel test", action="store_true")
     parser.add_argument("--skip-pv-test",
                         help="Do not run the P to V test", action="store_true")
@@ -2874,12 +2993,13 @@ def main():
     parser.add_argument("--warm-up-no-fail",
                         help="Continue running the test even if warm up times out", action="store_true")
     parser.add_argument("--no-cool-down",
-                        help="Do not wait for datapath flows to be cleared", action="store_true")
+                        help="Do not wait for datapath flows to be cleared",
+                        action="store_true")
     parser.add_argument("-v", "--virtual-interface", metavar="DEVICE",
                         help="Virtual interface", type=str,
                         default=DEFAULT_VIRTUAL_INTERFACE)
     # Removed VV test for now, as it needs non-upstream trafgen tool
-    #parser.add_argument("-w", "--second-virtual-interface", metavar="DEVICE",
+    # parser.add_argument("-w", "--second-virtual-interface", metavar="DEVICE",
     #                    help="Virtual interface for second VM", type=str,
     #                    default=DEFAULT_SECOND_VIRTUAL_INTERFACE)
     parser.add_argument("-x", "--tester-address", metavar="ADDRESS",
@@ -2944,8 +3064,9 @@ def main():
         lprint("ERROR: You must supply the OVS host address to use for testing!")
         sys.exit(-1)
 
-    if (not config.skip_vv_test or not config.skip_pv_test or \
-       not config.skip_pvp_test ) and config.dut_vm_address == '':
+    if (not config.skip_vv_test or not config.skip_pv_test or
+        not config.skip_pvp_test or config.run_pvp_zero_loss_test) \
+       and config.dut_vm_address == '':
         lprint("ERROR: You must supply the DUT VM host address to use for testing!")
         sys.exit(-1)
 
@@ -2969,9 +3090,9 @@ def main():
                    "be xx:xx:xx:00:00:00")
             sys.exit(-1)
 
-    if (not config.skip_vv_test or not config.skip_pv_test or \
-        not config.skip_pvp_test ) and \
-        not check_pci_address_string(config.dut_vm_nic_pci):
+    if (not config.skip_vv_test or not config.skip_pv_test or
+        not config.skip_pvp_test or config.run_pvp_zero_loss_test) and \
+       not check_pci_address_string(config.dut_vm_nic_pci):
         lprint("ERROR: You must supply a valid PCI address for the VMs NIC!")
         sys.exit(-1)
 
@@ -3000,8 +3121,9 @@ def main():
         lprint("ERROR: You must supply the second physical interface to use for testing!")
         sys.exit(-1)
 
-    if (not config.skip_vv_test or not config.skip_pv_test or \
-       not config.skip_pvp_test) and config.virtual_interface == '':
+    if (not config.skip_vv_test or not config.skip_pv_test or
+        not config.skip_pvp_test or config.run_pvp_zero_loss_test) and \
+       config.virtual_interface == '':
         lprint("ERROR: You must supply the virtual interface to use for testing!")
         sys.exit(-1)
 
@@ -3058,7 +3180,8 @@ def main():
         # are ran, as it needs a special config compared to the other tests.
         #
         if not config.skip_vv_test or not config.skip_pv_test \
-           or not config.skip_pvp_test or config.run_pp_test:
+           or not config.skip_pvp_test or config.run_pp_test or \
+           config.run_pvp_zero_loss_test:
             lprint("ERROR: Tunnel tests can only be run individually "
                    "with the no-bridge-config option!")
             sys.exit(-1)
@@ -3139,6 +3262,8 @@ def main():
     slogger.debug("  %-23.23s: %s", 'Skip PVP test', config.skip_pvp_test)
     slogger.debug("  %-23.23s: %s", 'Skip VV test', config.skip_vv_test)
     slogger.debug("  %-23.23s: %s", 'Run PP test', config.run_pp_test)
+    slogger.debug("  %-23.23s: %s", 'Run PVP 0 loss test',
+                  config.run_pvp_zero_loss_test)
     slogger.debug("  %-23.23s: %s", 'Warm-up', config.warm_up)
     slogger.debug("  %-23.23s: %s", 'No-cool-down', config.no_cool_down)
 
@@ -3231,7 +3356,8 @@ def main():
     #
     if not config.no_bridge_config:
         if not config.skip_pv_test or not config.skip_pvp_test or \
-           not config.skip_vv_test or config.run_pp_test:
+           not config.skip_vv_test or config.run_pp_test or \
+           config.run_pvp_zero_loss_test:
             #
             # Also skip if all we are running are the tunnel tests
             #
@@ -3241,7 +3367,8 @@ def main():
     # If we run only tunnel tests we need to skip this
     #
     if not config.skip_pv_test or not config.skip_pvp_test or \
-       not config.skip_vv_test or config.run_pp_test:
+       not config.skip_vv_test or config.run_pp_test or \
+       config.run_pvp_zero_loss_test:
 
         of_interfaces = dict()
         dp_interfaces = dict()
@@ -3430,6 +3557,34 @@ def main():
             csv_write_test_results(csv_handle, 'VXLAN Tunnel',
                                    stream_size_list, packet_size_list,
                                    vxlan_results, vxlan_cpu_results)
+
+        #
+        # Run the zero packet loss test
+        #
+        if config.run_pvp_zero_loss_test:
+            for nr_of_streams in stream_size_list:
+                test_results = dict()
+                for packet_size in packet_size_list:
+                    results, index = binary_search(1, 100, 0.00001,
+                                                   PVP_binary_search_single_run,
+                                                   PVP_binary_search_itteration_result,
+                                                   bs_step=1,
+                                                   packet_size=packet_size,
+                                                   nr_of_streams=nr_of_streams)
+
+                    if index >= 1:
+                        test_results[packet_size] = results[index]
+                        lprint("  ! Zero pkt loss @ pkt {}, load {}%,  "
+                               "miss {:.6f}%, rx rate {:,.0f} pps".
+                               format(packet_size, index,
+                                      calc_loss_percentage(
+                                          results[index]),
+                                      test_results[packet_size]
+                                      ["rx_packets_second"]))
+                    else:
+                        test_results[packet_size] = results[1]
+                        lprint("  ! Zero pkt loss for {} bytes, NOT reached!!".
+                               format(packet_size))
 
     #
     # Done...
