@@ -2201,6 +2201,8 @@ def create_single_graph(x, y, x_label, y_label, title,
 
     cpu_util = kwargs.pop("cpu_utilization", None)
     show_idle_cpu = kwargs.pop("show_cpu_idle", False)
+    zero_loss_traffic_rate = kwargs.pop("zero_loss_traffic_rate", None)
+    zero_loss_loss_rate = kwargs.pop("zero_loss_loss_rate", None)
 
     slogger.info("create_single_graph[{}], x = {} : y = {}".
                  format(title, x, y))
@@ -2218,7 +2220,6 @@ def create_single_graph(x, y, x_label, y_label, title,
     #
     # Main graph showing utilization
     #
-
     pps_plot.set_title(title)
     pps_plot.set_xlabel(x_label)
     pps_plot.set_ylabel(y_label)
@@ -2232,8 +2233,7 @@ def create_single_graph(x, y, x_label, y_label, title,
     #
     # Add second scaled graph showing line utilization
     #
-
-    if phy_speed > 0:
+    if phy_speed > 0 and zero_loss_traffic_rate is None:
         util_y = list()
 
         for i in range(0, len(x)):
@@ -2246,6 +2246,27 @@ def create_single_graph(x, y, x_label, y_label, title,
         util.set_ylabel('Link Utilization in % ({} Gbit/s)'.
                         format(phy_speed / 1000000000), color='r')
         util.tick_params('y', colors='r')
+
+    #
+    # Add second scaled graph showing zero loss traffic rate
+    #
+    if zero_loss_traffic_rate is not None:
+        util = pps_plot.twinx()
+        util.plot(x, zero_loss_traffic_rate, '.:', color='g')
+        if zero_loss_loss_rate is not None:
+            for i, x1 in enumerate(x):
+                #
+                # For tests where 0% packet loss is not met, mark it with a
+                # red square.
+                #
+                if zero_loss_loss_rate[i] > 0:
+                    util.plot(x1, zero_loss_traffic_rate[i],
+                              marker='s', color='r')
+
+        util.set_ylim(0, 100)
+        util.set_ylabel('Zero loss traffic rate in % ({} Gbit/s)'.
+                        format(phy_speed / 1000000000), color='g')
+        util.tick_params('y', colors='g')
 
     #
     # Adding CPU utilization if requested
@@ -2311,7 +2332,8 @@ def create_single_graph(x, y, x_label, y_label, title,
         cpu_plot.set_ylabel("CPU utilization")
         cpu_plot.set_xlabel(x_label)
         cpu_plot.grid(b=True, which='major')
-        cpu_plot.grid(b=True, which='minor', color='k', linestyle=':', alpha=0.2)
+        cpu_plot.grid(b=True, which='minor', color='k', linestyle=':',
+                      alpha=0.2)
         cpu_plot.minorticks_on()
         cpu_plot.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 
