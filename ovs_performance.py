@@ -306,7 +306,7 @@ def binary_search(min_value, max_value, required_result,
         if current_min == current_max - 1:
             break
 
-        current_test = current_min + ((current_max - current_min) / 2)
+        current_test = int(current_min + ((current_max - current_min) / 2))
 
         results[values[current_test]] = run_test_function(values[current_test],
                                                           **kwargs)
