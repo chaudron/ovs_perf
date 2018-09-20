@@ -237,9 +237,14 @@ def test_v2v(nr_of_flows, packet_sizes):
 # Calculate loss percentage
 #
 def calc_loss_percentage(results):
-    return 100 - (float(results["total_rx_pkts"])
-                  / float(results["total_tx_pkts"])
-                  * 100)
+    value = 100 - (float(results["total_rx_pkts"])
+                   / float(results["total_tx_pkts"])
+                   * 100)
+    if value < 0:
+        value = 0
+
+    return value
+
 
 #
 # Get the NFV results for a single binary search iteration
