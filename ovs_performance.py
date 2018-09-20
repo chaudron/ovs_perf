@@ -49,7 +49,6 @@
 #   - Add check after test to see all OF flows got packets (i.e. n_packets != 0)
 #   - Add option to stop trying more packet sizes once maximum performance
 #     of link is reached (i.e. two consecutive runs @ wire speed)
-#   - Test to determine maximum throughput without dropping packets
 #   - Add option to maximize traffic rate (PPS, and/or % based on port speed)
 #   - Add some VLAN test cases
 #   - Add a Bi-directional PVP test [phy0-vf0-VM-vf1-phy1]
@@ -2894,6 +2893,33 @@ def get_traffic_generator_type():
 
 
 #
+# Convert zero packet test result dictionary to cvs/graph dictionary list
+#
+def get_result_sets_from_zero_loss_results(results):
+    test_results = dict()
+    cpu_results = dict()
+    traffic_rate_results = dict()
+    loss_rate_results = dict()
+    for nr_of_flows, per_pkt_results in results.items():
+        test_results[nr_of_flows] = list()
+        cpu_results[nr_of_flows] = list()
+        traffic_rate_results[nr_of_flows] = list()
+        loss_rate_results[nr_of_flows] = list()
+        for pkt_size in natsorted(list(per_pkt_results.keys())):
+
+            test_results[nr_of_flows].append(
+                per_pkt_results[pkt_size]["rx_packets_second"])
+            cpu_results[nr_of_flows].append(
+                per_pkt_results[pkt_size]["cpu_stats"])
+            traffic_rate_results[nr_of_flows].append(
+                per_pkt_results[pkt_size]["traffic_rate"])
+            loss_rate_results[nr_of_flows].append(
+                calc_loss_percentage(per_pkt_results[pkt_size]))
+
+    return test_results, cpu_results, traffic_rate_results, loss_rate_results
+
+
+#
 # main()
 #
 def main():
@@ -3597,29 +3623,69 @@ def main():
         # Run the zero packet loss test
         #
         if config.run_pvp_zero_loss_test:
+            test_results = dict()
             for nr_of_streams in stream_size_list:
-                test_results = dict()
+                test_results[nr_of_streams] = dict()
                 for packet_size in packet_size_list:
-                    results, index = binary_search(1, 100, 0.00001,
-                                                   PVP_binary_search_single_run,
-                                                   PVP_binary_search_itteration_result,
-                                                   bs_step=1,
-                                                   packet_size=packet_size,
-                                                   nr_of_streams=nr_of_streams)
+                    results, index = binary_search(
+                        1, 100, 0.00001,
+                        PVP_binary_search_single_run,
+                        PVP_binary_search_itteration_result,
+                        bs_step=1,
+                        packet_size=packet_size,
+                        nr_of_streams=nr_of_streams)
+
+                    for dump_index in natsorted(list(results.keys())):
+                        result = results[dump_index]
+
+                        lprint(
+                            "  > Results: load {}%, rate {} pps, miss {:.6f}%".
+                            format(result["traffic_rate"],
+                                   result["rx_packets_second"],
+                                   calc_loss_percentage(result)))
 
                     if index >= 1:
-                        test_results[packet_size] = results[index]
+                        test_results[nr_of_streams][packet_size] = \
+                            results[index]
                         lprint("  ! Zero pkt loss @ pkt {}, load {}%,  "
                                "miss {:.6f}%, rx rate {:,.0f} pps".
                                format(packet_size, index,
                                       calc_loss_percentage(
                                           results[index]),
-                                      test_results[packet_size]
+                                      test_results[nr_of_streams][packet_size]
                                       ["rx_packets_second"]))
                     else:
-                        test_results[packet_size] = results[1]
+                        test_results[nr_of_streams][packet_size] = results[1]
                         lprint("  ! Zero pkt loss for {} bytes, NOT reached!!".
                                format(packet_size))
+
+            pvp0_results, pvp0_cpu_results, pvp0_traffic_rate, pvp0_loss_rate \
+                = get_result_sets_from_zero_loss_results(test_results)
+
+            # TODO: MAKE THIS PER RUN SO IT WILL SAVE THE RESULTS..
+            create_multiple_graph(packet_size_list, pvp0_results,
+                                  "Packet size", "Packets/second",
+                                  "Physical to Virtual to Physical, {}".
+                                  format(flow_str),
+                                  "test_p2v2p_zero_all_{}".
+                                  format(flow_file_str),
+                                  None, cpu_utilization=pvp0_cpu_results)
+
+            create_multiple_graph(packet_size_list, pvp0_results,
+                                  "Packet size", "Packets/second",
+                                  "Physical to Virtual to Physical, {}".
+                                  format(flow_str),
+                                  "test_p2v2p_zero_all_{}_ref".
+                                  format(flow_file_str),
+                                  [phy_speed],
+                                  cpu_utilization=pvp0_cpu_results)
+
+            csv_write_test_results(
+                csv_handle,
+                'Zero Loss Physical to Virtual to Physical test',
+                stream_size_list, packet_size_list,
+                pvp0_results, pvp0_cpu_results, loss_rate=pvp0_loss_rate,
+                traffic_rate=pvp0_traffic_rate)
 
     #
     # Done...
