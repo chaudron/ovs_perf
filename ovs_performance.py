@@ -257,7 +257,7 @@ def PVP_binary_search_single_run(test_value, **kwargs):
 
     results["traffic_rate"] = test_value
 
-    lprint("  > Zero pkt loss: pkt {}, load {}%,  miss {:.6f}%".
+    lprint("  > Zero pkt loss: pkt {}, load {:.6f}%,  miss {:.6f}%".
            format(packet_size, test_value,
                   calc_loss_percentage(results)))
 
@@ -542,14 +542,11 @@ def test_p2v2p(nr_of_flows, packet_sizes):
 def test_p2v2p_zero_loss(stream_size_list, packet_size_list, **kwargs):
 
     csv_handle = kwargs.pop("csv_handle", None)
+    zero_loss_step = kwargs.pop("zero_loss_step", 1)
     flow_str = get_flow_type_short()
     flow_file_str = get_flow_type_name()
     test_results = dict()
 
-    #
-    # Handy for debugging, make sure you run this with the following options:
-    #  --stream-list=10,100,1000 --packet-list=1024,1100,1500
-    #
     for nr_of_streams in stream_size_list:
         test_results[nr_of_streams] = dict()
         for packet_size in packet_size_list:
@@ -557,7 +554,7 @@ def test_p2v2p_zero_loss(stream_size_list, packet_size_list, **kwargs):
                 1, 100, 0.00001,
                 PVP_binary_search_single_run,
                 PVP_binary_search_itteration_result,
-                bs_step=1,
+                bs_step=zero_loss_step,
                 packet_size=packet_size,
                 nr_of_streams=nr_of_streams)
 
@@ -565,7 +562,7 @@ def test_p2v2p_zero_loss(stream_size_list, packet_size_list, **kwargs):
                 result = results[dump_index]
 
                 lprint(
-                    "  > Results: load {}%, rate {} pps, miss {:.6f}%".
+                    "  > Results: load {:.6f}%, rate {} pps, miss {:.6f}%".
                     format(result["traffic_rate"],
                            result["rx_packets_second"],
                            calc_loss_percentage(result)))
@@ -573,7 +570,7 @@ def test_p2v2p_zero_loss(stream_size_list, packet_size_list, **kwargs):
             if index >= 1:
                 test_results[nr_of_streams][packet_size] = \
                     results[index]
-                lprint("  ! Zero pkt loss @ pkt {}, load {}%,  "
+                lprint("  ! Zero pkt loss @ pkt {}, load {:.6f}%,  "
                        "miss {:.6f}%, rx rate {:,.0f} pps".
                        format(packet_size, index,
                               calc_loss_percentage(
@@ -3207,6 +3204,10 @@ def main():
     parser.add_argument("--mac-swap",
                         help="Swap source/destination mac at VM",
                         action="store_true")
+    parser.add_argument("--zero-loss-step", metavar="PERCENTAGE",
+                        help="Zero loss interval steps, default 1%",
+                        type=float, default=1)
+
 
     config = parser.parse_args()
 
@@ -3393,6 +3394,10 @@ def main():
                    "option!")
             sys.exit(-1)
 
+    if config.zero_loss_step > 25 or config.zero_loss_step < 0.001:
+        lprint("ERROR: Invalid zero loss interval step size supplied (0.001..25]!")
+        sys.exit(-1)
+
     #
     # Dump settings if global debug is enabled
     #
@@ -3446,12 +3451,13 @@ def main():
     slogger.debug("  %-23.23s: %s", 'Run PVP 0 loss test',
                   config.run_pvp_zero_loss_test)
     slogger.debug("  %-23.23s: %s", 'Warm-up', config.warm_up)
-    slogger.debug("  %-23.23s: %s", 'No-cool-down', config.no_cool_down)
+    slogger.debug("  %-23.23s: %s", 'No cool down', config.no_cool_down)
+    slogger.debug("  %-23.23s: %f", 'Zero loss step', config.zero_loss_step)
 
     #
     # If we use the GUI, we need to set the correct back-end
-    # However this does not seem to work always in a non-Tk back-end, if you get
-    # Tinker errors, set the following environment variable:
+    # However this does not seem to work always in a non-Tk back-end, if you
+    # get Tinker errors, set the following environment variable:
     #   export MPLBACKEND="agg"
     #
     # if config.gui:
@@ -3744,6 +3750,7 @@ def main():
         #
         if config.run_pvp_zero_loss_test:
             test_p2v2p_zero_loss(stream_size_list, packet_size_list,
+                                 zero_loss_step=config.zero_loss_step,
                                  csv_handle=csv_handle)
 
     #
