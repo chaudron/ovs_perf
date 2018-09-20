@@ -546,61 +546,74 @@ def test_p2v2p_zero_loss(stream_size_list, packet_size_list, **kwargs):
     flow_file_str = get_flow_type_name()
     test_results = dict()
 
+    #
+    # Handy for debugging, make sure you run this with the following options:
+    #  --stream-list=10,100,1000 --packet-list=1024,1100,1500
+    #
+    dbg_results = {10: {1024: {'cpu_stats': {'ovs_cpu': 200.07999999999998, 'sys_usr': 200.23999999999998, 'sys_nice': 0.0, 'sys_sys': 2.96, 'sys_iowait': 0.08, 'sys_irq': 0.0, 'sys_soft': 0.0, 'sys_steal': 0.0, 'sys_guest': 202.94, 'sys_gnice': 0.0, 'sys_idle': 2393.78, 'sys_total': 2800}, 'rx_packets_second': 2681985.5, 'total_tx_pkts': 66735366, 'total_rx_pkts': 66735367, 'traffic_rate': 56}, 1100: {'cpu_stats': {'ovs_cpu': 200.12, 'sys_usr': 200.16000000000003, 'sys_nice': 0.0, 'sys_sys': 0.47, 'sys_iowait': 0.08, 'sys_irq': 0.0, 'sys_soft': 0.0, 'sys_steal': 0.0, 'sys_guest': 200.07999999999998, 'sys_gnice': 0.0, 'sys_idle': 2399.23, 'sys_total': 2800}, 'rx_packets_second': 2544636.0625, 'total_tx_pkts': 66589477, 'total_rx_pkts': 66589478, 'traffic_rate': 57}, 1500: {'cpu_stats': {'ovs_cpu': 200.07999999999998, 'sys_usr': 200.07999999999998, 'sys_nice': 0.0, 'sys_sys': 0.48000000000000004, 'sys_iowait': 0.12, 'sys_irq': 0.0, 'sys_soft': 0.0, 'sys_steal': 0.0, 'sys_guest': 200.07999999999998, 'sys_gnice': 0.0, 'sys_idle': 2399.2400000000002, 'sys_total': 2800}, 'rx_packets_second': 2302630.5625, 'total_tx_pkts': 58711512, 'total_rx_pkts': 58711513, 'traffic_rate': 70}}, 100: {1024: {'cpu_stats': {'ovs_cpu': 199.95999999999998, 'sys_usr': 200.28000000000003, 'sys_nice': 0.0, 'sys_sys': 0.5399999999999999, 'sys_iowait': 0.0, 'sys_irq': 0.0, 'sys_soft': 0.0, 'sys_steal': 0.0, 'sys_guest': 200.04, 'sys_gnice': 0.0, 'sys_idle': 2399.14, 'sys_total': 2800}, 'rx_packets_second': 1819923.4375, 'total_tx_pkts': 47303320, 'total_rx_pkts': 47303321, 'traffic_rate': 38}, 1100: {'cpu_stats': {'ovs_cpu': 200.16, 'sys_usr': 200.24000000000004, 'sys_nice': 0.0, 'sys_sys': 0.4799999999999999, 'sys_iowait': 0.12, 'sys_irq': 0.0, 'sys_soft': 0.0, 'sys_steal': 0.0, 'sys_guest': 200.07999999999998, 'sys_gnice': 0.0, 'sys_idle': 2399.0800000000004, 'sys_total': 2800}, 'rx_packets_second': 1741068.1875, 'total_tx_pkts': 43551220, 'total_rx_pkts': 43551221, 'traffic_rate': 39}, 1500: {'cpu_stats': {'ovs_cpu': 200.04000000000002, 'sys_usr': 200.16000000000003, 'sys_nice': 0.0, 'sys_sys': 0.64, 'sys_iowait': 0.2, 'sys_irq': 0.0, 'sys_soft': 0.0, 'sys_steal': 0.0, 'sys_guest': 200.36, 'sys_gnice': 0.0, 'sys_idle': 2398.64, 'sys_total': 2800}, 'rx_packets_second': 1644736.625, 'total_tx_pkts': 42374248, 'total_rx_pkts': 42374249, 'traffic_rate': 50}}, 1000: {1024: {'cpu_stats': {'ovs_cpu': 200.24, 'sys_usr': 200.12, 'sys_nice': 0.0, 'sys_sys': 0.56, 'sys_iowait': 0.16, 'sys_irq': 0.0, 'sys_soft': 0.0, 'sys_steal': 0.0, 'sys_guest': 200.04, 'sys_gnice': 0.0, 'sys_idle': 2399.1200000000003, 'sys_total': 2800}, 'rx_packets_second': 766291.1875, 'total_tx_pkts': 19197436, 'total_rx_pkts': 19197437, 'traffic_rate': 16}, 1100: {'cpu_stats': {'ovs_cpu': 200.04000000000002, 'sys_usr': 200.16, 'sys_nice': 0.0, 'sys_sys': 0.5199999999999999, 'sys_iowait': 0.12, 'sys_irq': 0.0, 'sys_soft': 0.0, 'sys_steal': 0.0, 'sys_guest': 200.07999999999998, 'sys_gnice': 0.0, 'sys_idle': 2399.1200000000003, 'sys_total': 2800}, 'rx_packets_second': 758923.25, 'total_tx_pkts': 19328775, 'total_rx_pkts': 19328776, 'traffic_rate': 17}, 1500: {'cpu_stats': {'ovs_cpu': 200.24, 'sys_usr': 200.16000000000003, 'sys_nice': 0.0, 'sys_sys': 0.43999999999999995, 'sys_iowait': 0.16, 'sys_irq': 0.0, 'sys_soft': 0.0, 'sys_steal': 0.0, 'sys_guest': 200.07999999999998, 'sys_gnice': 0.0, 'sys_idle': 2399.16, 'sys_total': 2800}, 'rx_packets_second': 723685.0625, 'total_tx_pkts': 18319280, 'total_rx_pkts': 18319281, 'traffic_rate': 22}}}
+
     for nr_of_streams in stream_size_list:
         test_results[nr_of_streams] = dict()
         for packet_size in packet_size_list:
-            results, index = binary_search(
-                1, 100, 0.00001,
-                PVP_binary_search_single_run,
-                PVP_binary_search_itteration_result,
-                bs_step=1,
-                packet_size=packet_size,
-                nr_of_streams=nr_of_streams)
+            # results, index = binary_search(
+            #     1, 100, 0.00001,
+            #     PVP_binary_search_single_run,
+            #     PVP_binary_search_itteration_result,
+            #     bs_step=1,
+            #     packet_size=packet_size,
+            #     nr_of_streams=nr_of_streams)
 
-            for dump_index in natsorted(list(results.keys())):
-                result = results[dump_index]
+            # for dump_index in natsorted(list(results.keys())):
+            #     result = results[dump_index]
 
-                lprint(
-                    "  > Results: load {}%, rate {} pps, miss {:.6f}%".
-                    format(result["traffic_rate"],
-                           result["rx_packets_second"],
-                           calc_loss_percentage(result)))
+            #     lprint(
+            #         "  > Results: load {}%, rate {} pps, miss {:.6f}%".
+            #         format(result["traffic_rate"],
+            #                result["rx_packets_second"],
+            #                calc_loss_percentage(result)))
 
-            if index >= 1:
-                test_results[nr_of_streams][packet_size] = \
-                    results[index]
-                lprint("  ! Zero pkt loss @ pkt {}, load {}%,  "
-                       "miss {:.6f}%, rx rate {:,.0f} pps".
-                       format(packet_size, index,
-                              calc_loss_percentage(
-                                  results[index]),
-                              test_results[nr_of_streams][packet_size]
-                              ["rx_packets_second"]))
-            else:
-                test_results[nr_of_streams][packet_size] = results[1]
-                lprint("  ! Zero pkt loss for {} bytes, NOT reached!!".
-                       format(packet_size))
+            # if index >= 1:
+            #     test_results[nr_of_streams][packet_size] = \
+            #         results[index]
+            #     lprint("  ! Zero pkt loss @ pkt {}, load {}%,  "
+            #            "miss {:.6f}%, rx rate {:,.0f} pps".
+            #            format(packet_size, index,
+            #                   calc_loss_percentage(
+            #                       results[index]),
+            #                   test_results[nr_of_streams][packet_size]
+            #                   ["rx_packets_second"]))
+            # else:
+            #     test_results[nr_of_streams][packet_size] = results[1]
+            #     lprint("  ! Zero pkt loss for {} bytes, NOT reached!!".
+            #            format(packet_size))
 
-    pvp0_results, pvp0_cpu_results, pvp0_traffic_rate, pvp0_loss_rate \
-        = get_result_sets_from_zero_loss_results(test_results)
+            test_results[nr_of_streams][packet_size] = \
+                dbg_results[nr_of_streams][packet_size]
 
-    # TODO: MAKE THIS PER RUN SO IT WILL SAVE THE RESULTS..
-    create_multiple_graph(packet_size_list, pvp0_results,
-                          "Packet size", "Packets/second",
-                          "Physical to Virtual to Physical, {}".
-                          format(flow_str),
-                          "test_p2v2p_zero_all_{}".
-                          format(flow_file_str),
-                          None, cpu_utilization=pvp0_cpu_results)
+        #
+        # This might look like a wrong indentation, but we would like to update
+        # the graph every stream run so we have a graph in case of a failure.
+        #
+        pvp0_results, pvp0_cpu_results, pvp0_traffic_rate, pvp0_loss_rate \
+            = get_result_sets_from_zero_loss_results(test_results)
 
-    create_multiple_graph(packet_size_list, pvp0_results,
-                          "Packet size", "Packets/second",
-                          "Physical to Virtual to Physical, {}".
-                          format(flow_str),
-                          "test_p2v2p_zero_all_{}_ref".
-                          format(flow_file_str),
-                          [phy_speed],
-                          cpu_utilization=pvp0_cpu_results)
+        # TODO: MAKE THIS PER RUN SO IT WILL SAVE THE RESULTS..
+        create_multiple_graph(packet_size_list, pvp0_results,
+                              "Packet size", "Packets/second",
+                              "Physical to Virtual to Physical, {}".
+                              format(flow_str),
+                              "test_p2v2p_zero_all_{}".
+                              format(flow_file_str),
+                              None, cpu_utilization=pvp0_cpu_results)
+
+        create_multiple_graph(packet_size_list, pvp0_results,
+                              "Packet size", "Packets/second",
+                              "Physical to Virtual to Physical, {}".
+                              format(flow_str),
+                              "test_p2v2p_zero_all_{}_ref".
+                              format(flow_file_str),
+                              [phy_speed],
+                              cpu_utilization=pvp0_cpu_results)
 
     if csv_handle is not None:
         csv_write_test_results(
