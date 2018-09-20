@@ -2523,7 +2523,11 @@ def eth_max_pps(line_speed_bps, packet_size):
 # Print results in CSV
 #
 def csv_write_test_results(csv_handle, test_name, flow_size_list,
-                           packet_size_list, test_results, cpu_results):
+                           packet_size_list, test_results, cpu_results,
+                           **kwargs):
+
+    loss_rate = kwargs.pop("loss_rate", None)
+    traffic_rate = kwargs.pop("traffic_rate", None)
 
     if config.flow_type == 'L2':
         flow_type = ", L2 flows"
@@ -2540,11 +2544,37 @@ def csv_write_test_results(csv_handle, test_name, flow_size_list,
 
     if len(test_results) > 0:
         csv_handle.writerow(['', 'Packet size'])
-        csv_handle.writerow(['Number of flows'] + packet_size_list)
+        if loss_rate is not None or traffic_rate is not None:
+
+            lables = ['Receive rate']
+            packet_size_lables = []
+            l1 = []
+
+            if traffic_rate is not None:
+                lables.append('Traffic rate')
+                l1.append('')
+
+            if loss_rate is not None:
+                lables.append('Loss rate')
+                l1.append('')
+
+            for pkt in packet_size_list:
+                packet_size_lables.append(pkt)
+                packet_size_lables.extend(l1)
+
+            csv_handle.writerow(['Number of flows'] + packet_size_lables)
+            csv_handle.writerow([''] + lables * len(packet_size_list))
+        else:
+            csv_handle.writerow(['Number of flows'] + packet_size_list)
+
         for flow in flow_size_list:
             results = [flow]
             for i in range(0, len(packet_size_list)):
                 results.append(test_results[flow][i])
+                if traffic_rate is not None:
+                    results.append(traffic_rate[flow][i])
+                if loss_rate is not None:
+                    results.append(loss_rate[flow][i])
 
             csv_handle.writerow(results)
 
