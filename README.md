@@ -1623,7 +1623,7 @@ $ ethtool -i p2p1 | head -5
 driver: mlx5_core
 version: 5.0-0
 firmware-version: 16.23.1020 (MT_0000000013)
-expansion-rom-version: 
+expansion-rom-version:
 bus-info: 0000:65:00.0
 
 $ ethtool -K p2p1 hw-tc-offload on
@@ -2085,3 +2085,76 @@ When running the PVP script you should execute it with the following parameters:
   --dut-vm-nic-rxd=512 \               # Use 512 RX descriptors
   --skip-pv-test                       # Skip the Physical to Virtual test
 ```
+
+
+## Zero loss PVP testing
+
+Instead of the default PVP test, which sent packets at wire speed, the script
+also has support for a zero packet loss version. With the zero packet loss test,
+the script will decrease the traffic rate until no more packets get lost.
+
+The test starts with 50% of the transmit rate of the tester being used, and
+then uses a [binary search](https://en.wikipedia.org/wiki/Binary_search_algorithm) to
+determine the next traffic rate to test.
+
+By default, the script uses increments of 1%, which might be enough for testing
+10Gbits, as each step is 100Mbits. For 40Gbits, this becomes 400Mbits, and for
+100G this is 1G. To allow more granularity you can change the step size using
+the ```--zero-loss-step``` option. For example use ```--zero-loss-step=0.1``` to
+get the same 100Mbits steps with 100Gbps. Note that increasing the number of
+steps will increase the time it takes to complete the test.
+
+When running the zero packet loss test you SHOULD use the ```--warm-up``` option,
+as a single packet loss due to flow learning will influence the test results.
+
+The ```test_results.csv``` file will now also include the _traffic rate_ which
+is the percentage of the traffic rate sent by the tester. And the _loss rate_,
+which is the percentage of traffic loss when zero loss is not reached with
+the minimal traffic rate. The table below gives an example:
+
+
+| Packet size /   | 64           |              |           | 128          |              |           | 256          |              |           | 512          |              |           | 768          |              |           | 1024         |              |           | 1514         |              |           |
+|-----------------|--------------|--------------|-----------|--------------|--------------|-----------|--------------|--------------|-----------|--------------|--------------|-----------|--------------|--------------|-----------|--------------|--------------|-----------|--------------|--------------|-----------|
+| **Number of flows** | **Receive rate** | **Traffic rate** | **Loss rate** | **Receive rate** | **Traffic rate** | **Loss rate** | **Receive rate** | **Traffic rate** | **Loss rate** | **Receive rate** | **Traffic rate** | **Loss rate** | **Receive rate** | **Traffic rate** | **Loss rate** | **Receive rate** | **Traffic rate** | **Loss rate** |
+| **10**          | 3571428      | 6            | 0         | 3716313      | 11           | 0         | 3804404      | 21           | 0         | 3477428      | 37           | 0         | 2982212      | 47           | 0         | 2681984      | 56           | 0         | 2314166      | 71           | 0         |
+| **1000**        | 1785714      | 3            | 0         | 2027082      | 6            | 0         | 1992786      | 11           | 0         | 1973678      | 21           | 0         | 1840101      | 29           | 0         | 1724137      | 36           | 0         | 1597128      | 49           | 0         |
+| **10000**       | 1190476      | 2            | 0         | 1689207      | 5            | 0         | 1630457      | 9            | 0         | 1597737      | 17           | 0         | 1459426      | 23           | 0         | 1388891      | 29           | 0         | 1271177      | 39           | 0         |
+| **100000**      | 1190426      | 2            | 0         | 1013476      | 3            | 0         | 1086957      | 6            | 0         | 1127822      | 12           | 0         | 1078686      | 17           | 0         | 1053638      | 22           | 0         | 977819       | 30           | 0         |
+
+
+To run the PVP zero packet loss test you must include
+the ```--run-pvp-zero-loss-test``` option, and probably add
+the ```--skip-pvp-test``` option to NOT run the traditional PVP test.
+
+
+Below a full example on how to run the script:
+
+```
+# ~/ovs_perf/ovs_performance.py \
+  -d -l testrun_log.txt \              # Enable script debugging, and save the output to testrun_log.txt
+  --tester-type trex \                 # Set tester type to TRex
+  --tester-address localhost \         # IP address of the TRex server
+  --tester-interface 0 \               # Interface number used on the TRex
+  --ovs-address 10.19.17.133 \         # DUT IP address
+  --ovs-user root \                    # DUT login user name
+  --ovs-password root \                # DUT login user password
+  --dut-vm-address 192.168.122.5 \     # Address on which the VM is reachable, see above
+  --dut-vm-user root \                 # VM login user name
+  --dut-vm-password root \             # VM login user password
+  --dut-vm-nic-queues=2 \              # Number of rx/tx queues to use on the VM
+  --physical-interface dpdk0 \         # OVS Physical interface, i.e. connected to TRex
+  --physical-speed=40 \                # Speed of the physical interface, for DPDK we can not detect it reliably
+  --virtual-interface vhost0 \         # OVS Virtual interface, i.e. connected to the VM
+  --dut-vm-nic-pci=0000:00:02.0 \      # PCI address of the interface in the VM
+  --stream-list=10,1000,10000,100000 \ # Comma separated list of number of flows/streams to test with
+  --no-bridge-config \                 # Do not configure the OVS bridge, assume it's already done (see above)
+  --skip-pv-test \                     # Skip the Physical to Virtual test
+  --skip-pvp-test \                    # Skip the traditional PVP test
+  --run-pvp-zero-loss-test \           # Run the PVP Zero Loss test
+  --warm-up                            # Warm up before doing the individual runs
+```
+
+Below is an example graph from the above run:
+
+![pvpzero1000](images/test_p2v2p_zero_1000_l3.png)
+
