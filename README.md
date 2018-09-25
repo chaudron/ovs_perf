@@ -2101,8 +2101,8 @@ By default, the script uses increments of 1%, which might be enough for testing
 10Gbits, as each step is 100Mbits. For 40Gbits, this becomes 400Mbits, and for
 100G this is 1G. To allow more granularity you can change the step size using
 the ```--zero-loss-step``` option. For example use ```--zero-loss-step=0.1``` to
-get the same 100Mbits steps with 100G. Note that increasing the number of steps
-it will take longer for the test to complete.
+get the same 100Mbits steps with 100Gbps. Note that increasing the number of
+steps will increase the time it takes to complete the test.
 
 When running the zero packet loss test you SHOULD use the ```--warm-up``` option,
 as a single packet loss due to flow learning will influence the test results.
@@ -2122,7 +2122,7 @@ the minimal traffic rate. The table below gives an example:
 | **100000**      | 1190426      | 2            | 0         | 1013476      | 3            | 0         | 1086957      | 6            | 0         | 1127822      | 12           | 0         | 1078686      | 17           | 0         | 1053638      | 22           | 0         | 977819       | 30           | 0         |
 
 
-To run the PVP zero packet loss test you should include
+To run the PVP zero packet loss test you must include
 the ```--run-pvp-zero-loss-test``` option, and probably add
 the ```--skip-pvp-test``` option to NOT run the traditional PVP test.
 
