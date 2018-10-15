@@ -744,6 +744,10 @@ Bye...
 [root@localhost ~]#
 ```
 
+__NOTE__: You do not need to manually start _testpmd_ on the VM the script will
+take care of this.
+
+
 Finally get the IP address assigned to this VM, as we need it later when
 executing the PVP script.
 
@@ -952,6 +956,7 @@ usage: ovs_performance.py [-h] [--bridge-name BRIDGE] [-d] [--debug-dut-shell]
                           [--dut-vm-nic-queues QUEUES]
                           [--dut-vm-nic-rxd DESCRIPTORS]
                           [--dut-vm-nic-txd DESCRIPTORS]
+                          [--flow-rule-type {flows,NORMAL,port}]
                           [--flow-type {L2,L3,L4-UDP}] [-g]
                           [--no-bridge-config] [-o ADDRESS] [--ovs-user USER]
                           [--ovs-password PASSWORD] [-p DEVICE] [--perf]
@@ -959,7 +964,8 @@ usage: ovs_performance.py [-h] [--bridge-name BRIDGE] [-d] [--debug-dut-shell]
                           [--second-physical-interface DEVICE]
                           [--second-physical-interface-pci PCI]
                           [--physical-speed GBPS] [--packet-list LIST]
-                          [-r SECONDS] [--run-pp-test] [--skip-pv-test]
+                          [-r SECONDS] [--run-pp-test]
+                          [--run-pvp-zero-loss-test] [--skip-pv-test]
                           [--skip-pvp-test] [--stream-list LIST] [--warm-up]
                           [--warm-up-timeout SECONDS] [--warm-up-no-fail]
                           [--no-cool-down] [-v DEVICE] [-x ADDRESS]
@@ -967,6 +973,7 @@ usage: ovs_performance.py [-h] [--bridge-name BRIDGE] [-d] [--debug-dut-shell]
                           [--second-tester-interface {MOD,}PORT] [-l FILE]
                           [--dst-mac-address DST_MAC_ADDRESS]
                           [--src-mac-address SRC_MAC_ADDRESS] [--mac-swap]
+                          [--zero-loss-step PERCENTAGE]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -991,6 +998,8 @@ optional arguments:
                         Number of VM nic receive descriptors, default 4096
   --dut-vm-nic-txd DESCRIPTORS
                         Number of VM nic transmit descriptors, default 1024
+  --flow-rule-type {flows,NORMAL,port}
+                        Flow rules programmed, default flows
   --flow-type {L2,L3,L4-UDP}
                         Flow type used for the tests, default L3
   -g, --gui             Show graph GUI
@@ -1015,6 +1024,8 @@ optional arguments:
   -r SECONDS, --run-time SECONDS
                         Traffic run time per test
   --run-pp-test         Run the P to P test
+  --run-pvp-zero-loss-test
+                        Run the P to V to P test with zero packet loss
   --skip-pv-test        Do not run the P to V test
   --skip-pvp-test       Do not run the P to V to P test
   --stream-list LIST    List of stream sizes to test
@@ -1040,6 +1051,8 @@ optional arguments:
   --src-mac-address SRC_MAC_ADDRESS
                         Source Base MAC address
   --mac-swap            Swap source/destination mac at VM
+  --zero-loss-step PERCENTAGE
+                        Zero loss interval steps, default 1%
 ```
 
 __NOTES:__
@@ -1049,11 +1062,42 @@ _--skip-pv-test_ option.
 * The _--warm-up_ option will send out traffic before each iteration of a
 test and
 makes sure the data path flows exists before starting the actual throughput test.
-* Flow type L4-UDP is not supported with TRex yet.
 * The Physical to Physical setup is supported but has only been tested with
 Xena traffic generator.
 
+The next sub-chapters will explain some of the options in detail.
 
+
+### _--flow-type=_
+
+This option configures the traffic flows used, i.e. traffic sent out by the
+tester. The following options are available, each will sent out an Ethernet +
+IPv4 + UDP packet:
+
+* __L2__: For each packet sent the source and destination MAC addresses
+increase until the number of configures flows are reached.
+* __L3__ (default): For each packet sent the source and destination IPv4
+addresses increase until the number of configures flows are reached.
+* __L4-UDP__: For each packet sent the source and destination UDP ports
+increase until the number of configures flows are reached. __NOTE__: L4-UDP is
+not yet supported with TRex.
+
+
+### _--flow-rule-type=_
+
+This option configures the actual OpenFlow rules configured during the tests.
+The following options are available:
+
+* __flows__(default): Each traffic flow gets its own OpenFlow rule configured
+based on the ingress port, _in\_port_. Based on the configured _--flow-type_
+additional match criteria are programmed. For _L2_, _dl\_dst_, for _L3_ the
+_nw\_src_ / _nw\_dst_, for L4-UDP the _tp\_src_ / _tp\_dst_. Note that for PVP
+test this means two rules get programmed.
+One towards the VM, and one from the VM.
+* __NORMAL__: One OpenFlow rules gets programmed matching all traffic, with the
+NORMAL action, aka L2/FDB learning.
+* __port__: One (PP, PV) or two (PVP) rules get programmed redirecting all
+ingress port traffic to the required egress port.
 
 
 

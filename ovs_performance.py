@@ -1418,14 +1418,24 @@ def get_packets_per_second_from_pkt_counters(counters, strip):
 #
 def create_ovs_of_rules(number_of_flows, src_port, dst_port, **kwargs):
 
-    if config.flow_type == 'L2':
-        create_ovs_l2_of_rules(number_of_flows, src_port, dst_port, **kwargs)
-    elif config.flow_type == 'L3':
-        create_ovs_l3_of_rules(number_of_flows, src_port, dst_port, **kwargs)
-    elif config.flow_type == 'L4-UDP':
-        create_ovs_l4_of_rules(number_of_flows, src_port, dst_port, **kwargs)
+    if config.flow_rule_type == "flows":
+        if config.flow_type == 'L2':
+            create_ovs_l2_of_rules(number_of_flows,
+                                   src_port, dst_port, **kwargs)
+        elif config.flow_type == 'L3':
+            create_ovs_l3_of_rules(number_of_flows,
+                                   src_port, dst_port, **kwargs)
+        elif config.flow_type == 'L4-UDP':
+            create_ovs_l4_of_rules(number_of_flows,
+                                   src_port, dst_port, **kwargs)
+        else:
+            raise ValueError("No support for this protocol!!")
+    elif config.flow_rule_type == "NORMAL":
+        create_ovs_of_normal_rule(**kwargs)
+    elif config.flow_rule_type == "port":
+        create_ovs_of_phy_rule(src_port, dst_port, **kwargs)
     else:
-        raise ValueError("No support for this protocol!!")
+        raise ValueError("No support for this flow rule type!!")
 
 
 #
@@ -1434,19 +1444,24 @@ def create_ovs_of_rules(number_of_flows, src_port, dst_port, **kwargs):
 def create_ovs_bidirectional_of_rules(number_of_flows, src_port,
                                       dst_port, **kwargs):
 
-    if config.flow_type == 'L2':
-        create_ovs_bidirectional_l2_of_rules(number_of_flows, src_port,
-                                             dst_port, **kwargs)
-    elif config.flow_type == 'L2-NORMAL':
+    if config.flow_rule_type == "flows":
+        if config.flow_type == 'L2':
+            create_ovs_bidirectional_l2_of_rules(number_of_flows, src_port,
+                                                 dst_port, **kwargs)
+        elif config.flow_type == 'L3':
+            create_ovs_bidirectional_l3_of_rules(number_of_flows, src_port,
+                                                 dst_port, **kwargs)
+        elif config.flow_type == 'L4-UDP':
+            create_ovs_bidirectional_l4_of_rules(number_of_flows, src_port,
+                                                 dst_port, **kwargs)
+        else:
+            raise ValueError("No support for this protocol!!")
+    elif config.flow_rule_type == "NORMAL":
         create_ovs_of_normal_rule(**kwargs)
-    elif config.flow_type == 'L3':
-        create_ovs_bidirectional_l3_of_rules(number_of_flows, src_port,
-                                             dst_port, **kwargs)
-    elif config.flow_type == 'L4-UDP':
-        create_ovs_bidirectional_l4_of_rules(number_of_flows, src_port,
-                                             dst_port, **kwargs)
+    elif config.flow_rule_type == "port":
+        create_ovs_bidirectional_of_phy_rules(src_port, dst_port)
     else:
-        raise ValueError("No support for this protocol!!")
+        raise ValueError("No support for this flow rule type!!")
 
 
 #
@@ -1562,7 +1577,8 @@ def create_ovs_l2_of_rules(number_of_flows, src_port, dst_port, **kwargs):
 #
 # Add OVS Bidirectional L2 OpenFlow rules
 #
-def create_ovs_bidirectional_l2_of_rules(number_of_flows, src_port, dst_port, **kwargs):
+def create_ovs_bidirectional_l2_of_rules(number_of_flows,
+                                         src_port, dst_port, **kwargs):
     create_ovs_l2_of_rules(number_of_flows,
                            src_port,
                            dst_port)
@@ -2647,14 +2663,17 @@ def csv_write_test_results(csv_handle, test_name, flow_size_list,
 
     if config.flow_type == 'L2':
         flow_type = ", L2 flows"
-    elif config.flow_type == 'L2-NORMAL':
-        flow_type = ", L2 flows[NORMAL]"
     elif config.flow_type == 'L3':
         flow_type = ", L3 flows"
     elif config.flow_type == 'L4-UDP':
         flow_type = ", L4-udp flows"
     else:
         raise ValueError("No support for this protocol!!")
+
+    if config.flow_rule_type == 'NORMAL':
+        flow_type += "[NORMAL]"
+    elif config.flow_rule_type == 'port':
+        flow_type += "[port redirect]"
 
     csv_handle.writerow([test_name + flow_type])
 
@@ -2969,27 +2988,27 @@ def get_of_bridge_mac_address(bridge):
 
 
 #
-# Flow type definitions
+# Flow (rule) type definitions
 #
-flow_types = ['L2', 'L2-NORMAL', 'L3', 'L4-UDP']
+flow_types = ['L2', 'L3', 'L4-UDP']
+flow_rule_types = ['flows', 'NORMAL', 'port']
 
 
 def get_flow_type_short():
     labels = dict(list(zip(flow_types,
-                           ['L2', 'L2-NORMAL', 'L3', 'L4-UDP'])))
+                           ['L2', 'L3', 'L4-UDP'])))
     return labels[config.flow_type]
 
 
 def get_flow_type_name():
     labels = dict(list(zip(flow_types,
-                           ['l2', 'l2_NORMAL', 'l3', 'l4_udp'])))
+                           ['l2', 'l3', 'l4_udp'])))
     return labels[config.flow_type]
 
 
 def get_traffic_generator_flow():
     flow_type = dict(list(zip(flow_types,
                               [TrafficFlowType.l2_mac,
-                               TrafficFlowType.l2_mac,  # L2_NORMAL=L2 traffic
                                TrafficFlowType.l3_ipv4,
                                TrafficFlowType.l4_udp])))
     return flow_type[config.flow_type]
@@ -3034,6 +3053,17 @@ def get_result_sets_from_zero_loss_results(results):
                 calc_loss_percentage(per_pkt_results[pkt_size]))
 
     return test_results, cpu_results, traffic_rate_results, loss_rate_results
+
+
+#
+# is_vm_needed_for_tests()
+#
+def is_vm_needed_for_tests():
+    if not config.skip_vv_test or not config.skip_pv_test or \
+       not config.skip_pvp_test or config.run_pvp_zero_loss_test:
+        return True
+
+    return False
 
 
 #
@@ -3108,6 +3138,9 @@ def main():
     # parser.add_argument("--dut-second-vm-nic-pci", metavar="PCI",
     #                    help="PCI address of VMs virtual NIC", type=str,
     #                    default=DEFAULT_DUT_VM_NIC_PCI_ADDRESS)
+    parser.add_argument("--flow-rule-type",
+                        help="Flow rules programmed, default flows",
+                        choices=flow_rule_types, default='flows')
     parser.add_argument("--flow-type",
                         help="Flow type used for the tests, default L3",
                         choices=flow_types, default='L3')
@@ -3202,11 +3235,11 @@ def main():
                         help="Source Base MAC address",
                         type=str, default=DEFAULT_SRC_MAC_ADDRESS)
     parser.add_argument("--mac-swap",
-                        help="Swap source/destination mac at VM",
-                        action="store_true")
+                         help="Swap source/destination mac at VM",
+                         action="store_true")
     parser.add_argument("--zero-loss-step", metavar="PERCENTAGE",
-                        help="Zero loss interval steps, default 1%",
-                        type=float, default=1)
+                        help="Zero loss interval steps, default 1%%",
+                         type=float, default=1)
 
 
     config = parser.parse_args()
@@ -3246,9 +3279,7 @@ def main():
         lprint("ERROR: You must supply the OVS host address to use for testing!")
         sys.exit(-1)
 
-    if (not config.skip_vv_test or not config.skip_pv_test or
-        not config.skip_pvp_test or config.run_pvp_zero_loss_test) \
-       and config.dut_vm_address == '':
+    if is_vm_needed_for_tests() and config.dut_vm_address == '':
         lprint("ERROR: You must supply the DUT VM host address to use for testing!")
         sys.exit(-1)
 
@@ -3260,7 +3291,7 @@ def main():
         lprint("ERROR: You must supply a Source Base MAC Address")
         sys.exit(-1)
 
-    if config.flow_type == 'L2' or config.flow_type == 'L2-NORMAL':
+    if config.flow_type == 'L2':
         if (int(config.src_mac_address.replace(":", ""), 16) & 0xffffff) \
            != 0:
             lprint("ERROR: For L2 tests the Source Base MAC address must "
@@ -3272,8 +3303,7 @@ def main():
                    "be xx:xx:xx:00:00:00")
             sys.exit(-1)
 
-    if (not config.skip_vv_test or not config.skip_pv_test or
-        not config.skip_pvp_test or config.run_pvp_zero_loss_test) and \
+    if is_vm_needed_for_tests() and \
        not check_pci_address_string(config.dut_vm_nic_pci):
         lprint("ERROR: You must supply a valid PCI address for the VMs NIC!")
         sys.exit(-1)
@@ -3303,9 +3333,7 @@ def main():
         lprint("ERROR: You must supply the second physical interface to use for testing!")
         sys.exit(-1)
 
-    if (not config.skip_vv_test or not config.skip_pv_test or
-        not config.skip_pvp_test or config.run_pvp_zero_loss_test) and \
-       config.virtual_interface == '':
+    if is_vm_needed_for_tests() and config.virtual_interface == '':
         lprint("ERROR: You must supply the virtual interface to use for testing!")
         sys.exit(-1)
 
@@ -3382,15 +3410,8 @@ def main():
     if config.warm_up and (not config.skip_vv_test or config.run_vxlan_test):
         lprint("WARNING: Warm-up only works for P2P, P2V, and P2V2P tests!")
 
-    if config.flow_type == 'L2-NORMAL':
-        if not config.skip_vv_test or not config.skip_pv_test or \
-           config.run_pp_test:
-            lprint("ERROR: The L2-NORMAL flow type is only tested/supported "
-                   "with the PVP test!")
-            sys.exit(-1)
-
-        if not config.mac_swap:
-            lprint("ERROR: The L2-NORMAL flow type requires the --mac-swap "
+    if config.flow_rule_type == 'NORMAL' and not config.mac_swap:
+            lprint("ERROR: The NORMAL flow rule type requires the --mac-swap "
                    "option!")
             sys.exit(-1)
 
@@ -3587,8 +3608,6 @@ def main():
 
     if config.flow_type == 'L2':
         csv_file = "test_results_l2.csv"
-    elif config.flow_type == 'L2-NORMAL':
-        csv_file = "test_results_l2_normal.csv"
     elif config.flow_type == 'L3':
         csv_file = "test_results_l3.csv"
     elif config.flow_type == 'L4-UDP':
