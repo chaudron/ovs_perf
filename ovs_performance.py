@@ -1434,6 +1434,8 @@ def create_ovs_of_rules(number_of_flows, src_port, dst_port, **kwargs):
         create_ovs_of_normal_rule(**kwargs)
     elif config.flow_rule_type == "port":
         create_ovs_of_phy_rule(src_port, dst_port, **kwargs)
+    elif config.flow_rule_type == "none":
+        slogger.debug("No rules installed due to flow-rule-type=none")
     else:
         raise ValueError("No support for this flow rule type!!")
 
@@ -1460,6 +1462,8 @@ def create_ovs_bidirectional_of_rules(number_of_flows, src_port,
         create_ovs_of_normal_rule(**kwargs)
     elif config.flow_rule_type == "port":
         create_ovs_bidirectional_of_phy_rules(src_port, dst_port)
+    elif config.flow_rule_type == "none":
+        slogger.debug("No rules installed due to flow-rule-type=none")
     else:
         raise ValueError("No support for this flow rule type!!")
 
@@ -2991,7 +2995,7 @@ def get_of_bridge_mac_address(bridge):
 # Flow (rule) type definitions
 #
 flow_types = ['L2', 'L3', 'L4-UDP']
-flow_rule_types = ['flows', 'NORMAL', 'port']
+flow_rule_types = ['flows', 'NORMAL', 'port', 'none']
 
 
 def get_flow_type_short():

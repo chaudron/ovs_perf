@@ -956,7 +956,7 @@ usage: ovs_performance.py [-h] [--bridge-name BRIDGE] [-d] [--debug-dut-shell]
                           [--dut-vm-nic-queues QUEUES]
                           [--dut-vm-nic-rxd DESCRIPTORS]
                           [--dut-vm-nic-txd DESCRIPTORS]
-                          [--flow-rule-type {flows,NORMAL,port}]
+                          [--flow-rule-type {flows,NORMAL,port,none}]
                           [--flow-type {L2,L3,L4-UDP}] [-g]
                           [--no-bridge-config] [-o ADDRESS] [--ovs-user USER]
                           [--ovs-password PASSWORD] [-p DEVICE] [--perf]
@@ -998,7 +998,7 @@ optional arguments:
                         Number of VM nic receive descriptors, default 4096
   --dut-vm-nic-txd DESCRIPTORS
                         Number of VM nic transmit descriptors, default 1024
-  --flow-rule-type {flows,NORMAL,port}
+  --flow-rule-type {flows,NORMAL,port,none}
                         Flow rules programmed, default flows
   --flow-type {L2,L3,L4-UDP}
                         Flow type used for the tests, default L3
@@ -1098,6 +1098,7 @@ One towards the VM, and one from the VM.
 NORMAL action, aka L2/FDB learning.
 * __port__: One (PP, PV) or two (PVP) rules get programmed redirecting all
 ingress port traffic to the required egress port.
+* __none__: Do not program any rules, and leave the ones installed in place.
 
 
 
