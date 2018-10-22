@@ -2845,11 +2845,26 @@ def get_cpu_monitoring_stats():
     cmd = r"cat /var/tmp/cpu_ovs.txt"
     results = dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd], die_on_error=True)
 
+    ovs_cpu_pmd = float(0)
+    ovs_cpu_revalidator = float(0)
+    ovs_cpu_handler = float(0)
+    ovs_cpu_urcu = float(0)
+    ovs_cpu_other = float(0)
+
     #                    Average:   0        -   6982     0.00       0.05       0.00        0.05     -  |__ovs-vswitchd
-    regex = re.compile("^Average:\s+[0-9]+\s+-\s+[0-9]+\s+[0-9\.]+\s+[0-9\.]+\s+[0-9\.]+\s+([0-9\.]+).+", re.MULTILINE)
-    ovs_cpu_usage = float(0)
+    regex = re.compile("^Average:\s+[0-9]+\s+-\s+[0-9]+\s+[0-9\.]+\s+[0-9\.]+\s+[0-9\.]+\s+([0-9\.]+).+__(.+)", re.MULTILINE)
+
     for match in regex.finditer(results.stdout_output):
-        ovs_cpu_usage += float(match.group(1))
+        if match.group(2).startswith("pmd"):
+            ovs_cpu_pmd += float(match.group(1))
+        elif match.group(2).startswith("revalidator"):
+            ovs_cpu_revalidator += float(match.group(1))
+        elif match.group(2).startswith("handler"):
+            ovs_cpu_handler += float(match.group(1))
+        elif match.group(2).startswith("urcu"):
+            ovs_cpu_urcu += float(match.group(1))
+        else:
+            ovs_cpu_other += float(match.group(1))
 
     cmd = r"cat /var/tmp/cpu_mpstat.txt"
     results = dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd], die_on_error=True)
@@ -2883,7 +2898,15 @@ def get_cpu_monitoring_stats():
                     cpu_irq + cpu_soft + cpu_steal + cpu_guest +
                     cpu_gnice + cpu_idle)
 
-    cpu_results = dict([('ovs_cpu', ovs_cpu_usage),
+    ovs_cpu_total = ovs_cpu_pmd + ovs_cpu_revalidator + ovs_cpu_handler + \
+        ovs_cpu_urcu + ovs_cpu_other
+
+    cpu_results = dict([('ovs_cpu', ovs_cpu_total),
+                        ('ovs_cpu_pmd', ovs_cpu_pmd),
+                        ('ovs_cpu_revalidator', ovs_cpu_revalidator),
+                        ('ovs_cpu_handler', ovs_cpu_handler),
+                        ('ovs_cpu_urcu', ovs_cpu_urcu),
+                        ('ovs_cpu_other', ovs_cpu_other),
                         ('sys_usr', cpu_usr),
                         ('sys_nice', cpu_nice),
                         ('sys_sys', cpu_sys),
