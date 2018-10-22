@@ -2226,7 +2226,6 @@ def create_single_graph(x, y, x_label, y_label, title,
                         file_name, phy_speed, **kwargs):
 
     cpu_util = kwargs.pop("cpu_utilization", None)
-    show_idle_cpu = kwargs.pop("show_cpu_idle", False)
     zero_loss_traffic_rate = kwargs.pop("zero_loss_traffic_rate", None)
     zero_loss_loss_rate = kwargs.pop("zero_loss_loss_rate", None)
 
@@ -2237,11 +2236,15 @@ def create_single_graph(x, y, x_label, y_label, title,
         fig, pps = plt.subplots()
         pps_plot = pps
     else:
-        fig, pps = plt.subplots(2)
+        sub_plots = 4
+        fig, pps = plt.subplots(sub_plots)
         pps_plot = pps[0]
+        pmd_plot = pps[1]
+        ovs_plot = pps[2]
+        sys_plot = pps[3]
 
-        fig.set_figwidth(2 * fig.get_figwidth(), forward=True)
-        fig.set_figheight(2 * fig.get_figheight(), forward=True)
+        fig.set_figwidth(sub_plots * fig.get_figwidth(), forward=True)
+        fig.set_figheight(sub_plots * fig.get_figheight(), forward=True)
 
     #
     # Main graph showing utilization
@@ -2298,12 +2301,12 @@ def create_single_graph(x, y, x_label, y_label, title,
     # Adding CPU utilization if requested
     #
     if cpu_util is not None:
+        other_y_values = list()
+        urcu_y_values = list()
+        handler_y_values = list()
+        revalidator_y_values = list()
+        pmd_y_values = list()
 
-        cpu_plot = pps[1]
-        x_cpu = np.arange(len(x))
-        bar_width = 0.20
-
-        ovs_y_values = list()
         usr_y_values = list()
         nice_y_values = list()
         sys_y_values = list()
@@ -2314,9 +2317,15 @@ def create_single_graph(x, y, x_label, y_label, title,
         guest_y_values = list()
         gnice_y_values = list()
         idle_y_values = list()
+
         for i in range(0, len(x)):
-            ovs_y_values.append(cpu_util[i]['ovs_cpu'])
-            usr_y_values.append(cpu_util[i]['sys_usr'])
+            pmd_y_values.append(cpu_util[i]['ovs_cpu_pmd'])
+            revalidator_y_values.append(cpu_util[i]['ovs_cpu_revalidator'])
+            handler_y_values.append(cpu_util[i]['ovs_cpu_handler'])
+            urcu_y_values.append(cpu_util[i]['ovs_cpu_urcu'])
+            other_y_values.append(cpu_util[i]['ovs_cpu_other'])
+            usr_y_values.append(cpu_util[i]['sys_usr'] -
+                                cpu_util[i]['ovs_cpu'])
             nice_y_values.append(cpu_util[i]['sys_nice'])
             sys_y_values.append(cpu_util[i]['sys_sys'])
             iowait_y_values.append(cpu_util[i]['sys_iowait'])
@@ -2327,41 +2336,97 @@ def create_single_graph(x, y, x_label, y_label, title,
             gnice_y_values.append(cpu_util[i]['sys_gnice'])
             idle_y_values.append(cpu_util[i]['sys_idle'])
 
-        y_cpu_values = [usr_y_values, nice_y_values, sys_y_values,
-                        iowait_y_values, irq_y_values, soft_y_values,
-                        steal_y_values, guest_y_values, gnice_y_values,
+        total_util = cpu_util[0]['sys_usr'] + cpu_util[0]['sys_nice'] + \
+            cpu_util[0]['sys_sys'] + cpu_util[0]['sys_iowait'] + \
+            cpu_util[0]['sys_irq'] + cpu_util[0]['sys_soft'] +  \
+            cpu_util[0]['sys_steal'] + cpu_util[0]['sys_guest'] + \
+            cpu_util[0]['sys_gnice'] + cpu_util[0]['sys_idle']
+
+        #
+        # Adding PMD CPU utilization
+        #
+        x_cpu = np.arange(len(x))
+        bar_width = 0.20
+
+        pmd_plot.bar(x_cpu, pmd_y_values, bar_width,
+                     color="#1f77b4", edgecolor="none",
+                     label="OVS PMD", align="edge")
+
+        pmd_plot.bar(x_cpu + bar_width, guest_y_values, bar_width,
+                     color="#ff7f0e", edgecolor="none",
+                     label="Guest", align="edge")
+
+        pmd_plot.set_title("Guest and Open vSwitch PMD CPU usage")
+        pmd_plot.set_xlim(0 - (2 * bar_width),
+                          len(x_cpu) - 1 + (4 * bar_width))
+        pmd_plot.set_xticks(x_cpu + bar_width)
+        pmd_plot.set_xticklabels(x, ha='center')
+        pmd_plot.set_ylabel("CPU utilization")
+        pmd_plot.set_xlabel("Packet size")
+        pmd_plot.grid(b=True, which='major', axis='y')
+        pmd_plot.grid(b=True, which='minor', color='k', linestyle=':',
+                      alpha=0.2, axis='y')
+        pmd_plot.minorticks_on()
+        pmd_plot.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+
+        #
+        # Adding OVS CPU utilization
+        #
+        y_ovs_values = [other_y_values, urcu_y_values, handler_y_values,
+                        revalidator_y_values, pmd_y_values]
+        y_ovs_colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728',
+                        '#9467bd']
+        y_ovs_labels = ['other', 'urcu', 'handler',
+                        'revalidator', 'pmd']
+
+        bottom = [0] * len(x)
+        for i in range(0, len(y_ovs_values) - 1):
+            ovs_plot.bar(x_cpu, y_ovs_values[i], bar_width,
+                         color=y_ovs_colors[i], edgecolor=y_ovs_colors[i],
+                         bottom=bottom, label=y_ovs_labels[i], align="center")
+            bottom = [a + b for a, b in zip(bottom, y_ovs_values[i])]
+
+        ovs_plot.set_title("Open vSwitch CPU usage non PMD")
+        ovs_plot.set_xticks(x_cpu)
+        ovs_plot.set_xticklabels(x, ha='center')
+        ovs_plot.set_ylabel("CPU utilization")
+        ovs_plot.set_xlabel("Packet size")
+        ovs_plot.grid(b=True, which='major', axis='y')
+        ovs_plot.grid(b=True, which='minor', color='k', linestyle=':',
+                      alpha=0.2, axis='y')
+        ovs_plot.minorticks_on()
+        ovs_plot.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+
+        #
+        # Adding System CPU utilization
+        #
+        y_cpu_values = [nice_y_values, sys_y_values, iowait_y_values,
+                        irq_y_values, soft_y_values, steal_y_values,
+                        gnice_y_values, usr_y_values, guest_y_values,
                         idle_y_values]
         y_cpu_colors = ['#1f77b4', '#aec7e8', '#ff7f0e', '#ffbb78', '#2ca02c',
                         '#98df8a', '#d62728', '#ff9896', '#9467bd', '#c5b0d5']
-        y_cpu_labels = ['usr', 'nice', 'sys', 'iowait', 'irq',
-                        'soft', 'steal', 'guest', 'gnice', 'idle']
-
-        cpu_plot.bar(x_cpu, ovs_y_values, bar_width, label='OVS',
-                     color='b', edgecolor='b')
+        y_cpu_labels = ['nice', 'sys', 'iowait', 'irq', 'soft', 'steal',
+                        'gnice', 'usr', 'guest', 'idle']
 
         bottom = [0] * len(x)
-        for i in range(0, len(y_cpu_values) - (1, 0)[show_idle_cpu]):
-            cpu_plot.bar(x_cpu + bar_width, y_cpu_values[i], bar_width,
+        for i in range(0, len(y_cpu_values) - 2):
+            sys_plot.bar(x_cpu, y_cpu_values[i], bar_width,
                          color=y_cpu_colors[i], edgecolor=y_cpu_colors[i],
-                         bottom=bottom, label=y_cpu_labels[i])
+                         bottom=bottom, label=y_cpu_labels[i], align="center")
             bottom = [a + b for a, b in zip(bottom, y_cpu_values[i])]
 
-        if show_idle_cpu:
-            total_util = bottom[0]
-        else:
-            total_util = bottom[0] + y_cpu_values[i+1][0]
+        sys_plot.set_title("System CPU usage (max {:.0f}%)".format(total_util))
 
-        cpu_plot.set_title("Open vSwitch, and system CPU usage (max {:.0f}%)".
-                           format(total_util))
-        cpu_plot.set_xticks(x_cpu + bar_width)
-        cpu_plot.set_xticklabels(x)
-        cpu_plot.set_ylabel("CPU utilization")
-        cpu_plot.set_xlabel(x_label)
-        cpu_plot.grid(b=True, which='major')
-        cpu_plot.grid(b=True, which='minor', color='k', linestyle=':',
-                      alpha=0.2)
-        cpu_plot.minorticks_on()
-        cpu_plot.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        sys_plot.set_xticks(x_cpu)
+        sys_plot.set_xticklabels(x, ha='center')
+        sys_plot.set_ylabel("CPU utilization")
+        sys_plot.set_xlabel("Packet Size")
+        sys_plot.grid(b=True, which='major', axis='y')
+        sys_plot.grid(b=True, which='minor', color='k', linestyle=':',
+                      alpha=0.2, axis='y')
+        sys_plot.minorticks_on()
+        sys_plot.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 
     #
     # Due to bug in matplotlib we need to disable some np errors
@@ -2373,8 +2438,12 @@ def create_single_graph(x, y, x_label, y_label, title,
     #
     fig.tight_layout()
     if cpu_util is not None:
-        box = cpu_plot.get_position()
-        cpu_plot.set_position([box.x0, box.y0, box.width * 0.9, box.height])
+        box = pmd_plot.get_position()
+        pmd_plot.set_position([box.x0, box.y0, box.width * 0.9, box.height])
+        box = ovs_plot.get_position()
+        ovs_plot.set_position([box.x0, box.y0, box.width * 0.9, box.height])
+        box = sys_plot.get_position()
+        sys_plot.set_position([box.x0, box.y0, box.width * 0.9, box.height])
 
     #
     # Write picture
@@ -2497,7 +2566,8 @@ def create_multiple_graph(x, y, x_label, y_label,
         cpu_plot.set_ylabel("CPU utilization")
         cpu_plot.set_xlabel(x_label)
         cpu_plot.grid(b=True, which='major')
-        cpu_plot.grid(b=True, which='minor', color='k', linestyle=':', alpha=0.2)
+        cpu_plot.grid(b=True, which='minor', color='k', linestyle=':',
+                      alpha=0.2)
         cpu_plot.minorticks_on()
 
         #
@@ -2532,8 +2602,9 @@ def create_multiple_graph(x, y, x_label, y_label,
                         idle_y_values]
         y_cpu_labels = ['usr', 'nice', 'sys', 'iowait', 'irq',
                         'soft', 'steal', 'guest', 'gnice', 'idle']
-        y_cpu_keys = ['sys_usr', 'sys_nice', 'sys_sys', 'sys_iowait', 'sys_irq',
-                      'sys_soft', 'sys_steal', 'sys_guest', 'sys_gnice', 'sys_idle']
+        y_cpu_keys = ['sys_usr', 'sys_nice', 'sys_sys', 'sys_iowait',
+                      'sys_irq', 'sys_soft', 'sys_steal', 'sys_guest',
+                      'sys_gnice', 'sys_idle']
         y_cpu_colors = ['#1f77b4', '#aec7e8', '#ff7f0e', '#ffbb78', '#2ca02c',
                         '#98df8a', '#d62728', '#ff9896', '#9467bd', '#c5b0d5']
 
@@ -2553,8 +2624,8 @@ def create_multiple_graph(x, y, x_label, y_label,
             bottom = [0] * len(x)
             for j in range(0, len(y_cpu_values) - (1, 0)[show_idle_cpu]):
 
-                sys_plot.bar(x_pos, y_cpu_values[j][key], bar_width, align=align,
-                             color=y_cpu_colors[j],
+                sys_plot.bar(x_pos, y_cpu_values[j][key], bar_width,
+                             align=align, color=y_cpu_colors[j],
                              label=y_cpu_labels[j] if i == 0 else "",
                              bottom=bottom)
                 bottom = [a + b for a, b in zip(bottom, y_cpu_values[j][key])]
@@ -2566,7 +2637,8 @@ def create_multiple_graph(x, y, x_label, y_label,
         sys_plot.set_ylabel("CPU utilization")
         sys_plot.set_xlabel(x_label)
         sys_plot.grid(b=True, which='major')
-        sys_plot.grid(b=True, which='minor', color='k', linestyle=':', alpha=0.2)
+        sys_plot.grid(b=True, which='minor', color='k', linestyle=':',
+                      alpha=0.2)
         sys_plot.minorticks_on()
 
         handles, labels = sys_plot.get_legend_handles_labels()
