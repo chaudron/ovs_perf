@@ -2350,11 +2350,11 @@ def create_single_graph(x, y, x_label, y_label, title,
 
         pmd_plot.bar(x_cpu, pmd_y_values, bar_width,
                      color="#1f77b4", edgecolor="none",
-                     label="OVS PMD", align="edge")
+                     label="OVS PMD", align="edge", zorder=3)
 
         pmd_plot.bar(x_cpu + bar_width, guest_y_values, bar_width,
                      color="#ff7f0e", edgecolor="none",
-                     label="Guest", align="edge")
+                     label="Guest", align="edge", zorder=3)
 
         pmd_plot.set_title("Guest and Open vSwitch PMD CPU usage")
         pmd_plot.set_xlim(0 - (2 * bar_width),
@@ -2383,7 +2383,8 @@ def create_single_graph(x, y, x_label, y_label, title,
         for i in range(0, len(y_ovs_values) - 1):
             ovs_plot.bar(x_cpu, y_ovs_values[i], bar_width,
                          color=y_ovs_colors[i], edgecolor=y_ovs_colors[i],
-                         bottom=bottom, label=y_ovs_labels[i], align="center")
+                         bottom=bottom, label=y_ovs_labels[i], align="center",
+                         zorder=3)
             bottom = [a + b for a, b in zip(bottom, y_ovs_values[i])]
 
         ovs_plot.set_title("Open vSwitch CPU usage non PMD")
@@ -2413,7 +2414,8 @@ def create_single_graph(x, y, x_label, y_label, title,
         for i in range(0, len(y_cpu_values) - 2):
             sys_plot.bar(x_cpu, y_cpu_values[i], bar_width,
                          color=y_cpu_colors[i], edgecolor=y_cpu_colors[i],
-                         bottom=bottom, label=y_cpu_labels[i], align="center")
+                         bottom=bottom, label=y_cpu_labels[i], align="center",
+                         zorder=3)
             bottom = [a + b for a, b in zip(bottom, y_cpu_values[i])]
 
         sys_plot.set_title("System CPU usage (max {:.0f}%)".format(total_util))
@@ -2541,12 +2543,36 @@ def create_multiple_graph(x, y, x_label, y_label,
         bar_width = 0.11
         cpu_plot.set_title("Open vSwitch CPU utilization")
 
-        ovs_y_values = dict(list(zip(list(cpu_util.keys()),
-                                     [[] for i in range(len(cpu_util))])))
+        other_y_values = dict(list(zip(list(
+            cpu_util.keys()), [[] for i in range(len(cpu_util))])))
+        urcu_y_values = dict(list(zip(list(
+            cpu_util.keys()), [[] for i in range(len(cpu_util))])))
+        handler_y_values = dict(list(zip(list(
+            cpu_util.keys()), [[] for i in range(len(cpu_util))])))
+        revalidator_y_values = dict(list(zip(list(
+            cpu_util.keys()), [[] for i in range(len(cpu_util))])))
+        pmd_y_values = dict(list(zip(list(
+            cpu_util.keys()), [[] for i in range(len(cpu_util))])))
 
         for i in range(0, len(x)):
             for key in list(cpu_util.keys()):
-                ovs_y_values[key].append(cpu_util[key][i]['ovs_cpu'])
+                pmd_y_values[key].append(
+                    cpu_util[key][i]['ovs_cpu_pmd'])
+                revalidator_y_values[key].append(
+                    cpu_util[key][i]['ovs_cpu_revalidator'])
+                handler_y_values[key].append(
+                    cpu_util[key][i]['ovs_cpu_handler'])
+                urcu_y_values[key].append(
+                    cpu_util[key][i]['ovs_cpu_urcu'])
+                other_y_values[key].append(
+                    cpu_util[key][i]['ovs_cpu_other'])
+
+        y_ovs_values = [other_y_values, urcu_y_values, handler_y_values,
+                        revalidator_y_values, pmd_y_values]
+        y_ovs_colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728',
+                        '#9467bd']
+        y_ovs_labels = ['other', 'urcu', 'handler',
+                        'revalidator', 'pmd']
 
         if len(cpu_util) % 2 != 0:
             align = 'center'
@@ -2554,10 +2580,17 @@ def create_multiple_graph(x, y, x_label, y_label,
             align = 'edge'
 
         for i, key in enumerate(natsorted(list(cpu_util.keys()))):
-            colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
             x_pos = (x_cpu - (len(cpu_util) / 2 * bar_width)) + (i * bar_width)
-            cpu_plot.bar(x_pos, ovs_y_values[key], bar_width, align=align,
-                         color=colors[i % len(colors)], edgecolor="none")
+
+            bottom = [0] * len(x)
+            for j in range(0, len(y_ovs_values)):
+
+                cpu_plot.bar(x_pos, y_ovs_values[j][key], bar_width,
+                             align=align, color=y_ovs_colors[j],
+                             label=y_ovs_labels[j] if i == 0 else "",
+                             bottom=bottom, zorder=3,
+                             linewidth=1, edgecolor=(1, 1, 1, 0.2))
+                bottom = [a + b for a, b in zip(bottom, y_ovs_values[j][key])]
 
         cpu_plot.set_xlim(0 - (len(cpu_util) * bar_width),
                           len(x_cpu) - 1 + (len(cpu_util) * bar_width))
@@ -2569,6 +2602,11 @@ def create_multiple_graph(x, y, x_label, y_label,
         cpu_plot.grid(b=True, which='minor', color='k', linestyle=':',
                       alpha=0.2)
         cpu_plot.minorticks_on()
+
+        handles, labels = cpu_plot.get_legend_handles_labels()
+        cpu_plot.legend(list(reversed(handles)),
+                        list(reversed(labels)),
+                        loc='center left', bbox_to_anchor=(1, 0.5))
 
         #
         # System CPU utilization
@@ -2627,7 +2665,8 @@ def create_multiple_graph(x, y, x_label, y_label,
                 sys_plot.bar(x_pos, y_cpu_values[j][key], bar_width,
                              align=align, color=y_cpu_colors[j],
                              label=y_cpu_labels[j] if i == 0 else "",
-                             bottom=bottom)
+                             bottom=bottom, zorder=3,
+                             linewidth=1, edgecolor=(1, 1, 1, 0.2))
                 bottom = [a + b for a, b in zip(bottom, y_cpu_values[j][key])]
 
         sys_plot.set_xlim(0 - (len(cpu_util) * bar_width),
@@ -2656,8 +2695,10 @@ def create_multiple_graph(x, y, x_label, y_label,
     #
     fig.tight_layout()
     if cpu_util is not None:
+        box = cpu_plot.get_position()
+        cpu_plot.set_position([box.x0, box.y0, box.width * 0.89, box.height])
         box = sys_plot.get_position()
-        sys_plot.set_position([box.x0, box.y0, box.width * 0.90, box.height])
+        sys_plot.set_position([box.x0, box.y0, box.width * 0.89, box.height])
 
     #
     # Write picture

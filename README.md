@@ -920,8 +920,8 @@ will show all flow sizes in one graph with the addition of the theoretical
 maximum, the ___test\_p2v2p\_all\_l3.png___ does not show the theoretical
 maximum.
 
-Below you will find the content of the ___test\_p2v2p\_10000\_l3.png___ and
-___test\_p2v2p\_all\_l3\_ref.png___ as an example.
+Below you will find the content of a ___test\_p2v2p\_10000\_l3.png___ and
+___test\_p2v2p\_all\_l3\_ref.png___ taken with an XL710 network card as an example.
 
 #### ___test\_p2v2p\_10000\_l3.png___:
 ![pvp1000](images/test_p2v2p_10000_l3.png)
