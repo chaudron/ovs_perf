@@ -966,7 +966,8 @@ usage: ovs_performance.py [-h] [--bridge-name BRIDGE] [-d] [--debug-dut-shell]
                           [--physical-speed GBPS] [--packet-list LIST]
                           [-r SECONDS] [--run-pp-test]
                           [--run-pvp-zero-loss-test] [--skip-pv-test]
-                          [--skip-pvp-test] [--stream-list LIST] [--warm-up]
+                          [--skip-pvp-test] [--stream-list LIST]
+                          [--traffic-rate PERCENTAGE] [--warm-up]
                           [--warm-up-timeout SECONDS] [--warm-up-no-fail]
                           [--no-cool-down] [-v DEVICE] [-x ADDRESS]
                           [--tester-type {xena,trex}] [-i {MOD,}PORT]
@@ -1029,6 +1030,8 @@ optional arguments:
   --skip-pv-test        Do not run the P to V test
   --skip-pvp-test       Do not run the P to V to P test
   --stream-list LIST    List of stream sizes to test
+  --traffic-rate PERCENTAGE
+                        Traffic rate sent by tester, default 100%
   --warm-up             Do flow warm-up round before tests
   --warm-up-timeout SECONDS
                         Warm up timeout
@@ -1099,6 +1102,15 @@ NORMAL action, aka L2/FDB learning.
 * __port__: One (PP, PV) or two (PVP) rules get programmed redirecting all
 ingress port traffic to the required egress port.
 * __none__: Do not program any rules, and leave the ones installed in place.
+
+
+### _--traffic-rate=_
+
+This option allows configuration of a lower traffic rate used by the
+_Physical to Virtual back to Physical_, _Physical to Virtual_ or
+_Physical to Physical_ tests. By default, the tester will send traffic at
+its interface line rate. This option allows sending traffic at a lower speed.
+For example, use a value of _2.5_ to sent 1Gbps out of a 40Gbps interface.
 
 
 

@@ -519,7 +519,9 @@ def test_p2v2p(nr_of_flows, packet_sizes):
     cpu_results = list()
 
     for packet_size in packet_sizes:
-        results = test_p2v2p_single_packet_size(nr_of_flows, packet_size)
+        results = test_p2v2p_single_packet_size(nr_of_flows, packet_size,
+                                                decrease_rate=100 -
+                                                config.traffic_rate)
 
         cpu_results.append(results["cpu_stats"])
         p2v2p_results.append(results["rx_packets_second"])
@@ -527,7 +529,8 @@ def test_p2v2p(nr_of_flows, packet_sizes):
     create_single_graph(packet_sizes, p2v2p_results,
                         "Packet size", "Packets/second",
                         "Physical to Virtual back to Physical with {} {} "
-                        "flows".format(nr_of_flows,  get_flow_type_short()),
+                        "flows{}".format(nr_of_flows,  get_flow_type_short(),
+                                         get_traffic_rate_str()),
                         "test_p2v2p_{}_{}".format(nr_of_flows,
                                                   get_flow_type_name()),
                         phy_speed,
@@ -642,9 +645,9 @@ def test_p2v(nr_of_flows, packet_sizes):
     for packet_size in packet_sizes:
 
         ##################################################
-        lprint("- [TEST: {0}(flows={1}, packet_size={2})] START".
-               format(inspect.currentframe().f_code.co_name,
-                      nr_of_flows, packet_size))
+        lprint("- [TEST: {0}(flows={1}, packet_size={2}, rate={3:.3f}%)]"
+               " START".format(inspect.currentframe().f_code.co_name,
+                               nr_of_flows, packet_size, config.traffic_rate))
 
         ##################################################
         lprint("  * Create OVS OpenFlow rules...")
@@ -658,7 +661,8 @@ def test_p2v(nr_of_flows, packet_sizes):
                                         get_traffic_generator_flow(),
                                         nr_of_flows, packet_size,
                                         traffic_dst_mac=config.dst_mac_address,
-                                        traffic_src_mac=config.src_mac_address)
+                                        traffic_src_mac=config.src_mac_address,
+                                        percentage=config.traffic_rate * 10000)
 
         ##################################################
         if config.warm_up:
@@ -759,8 +763,9 @@ def test_p2v(nr_of_flows, packet_sizes):
 
     create_single_graph(packet_sizes, p2v_results,
                         "Packet size", "Packets/second",
-                        "Physical to Virtual with {} {} flows".
-                        format(nr_of_flows, get_flow_type_short()),
+                        "Physical to Virtual with {} {} flows{}".
+                        format(nr_of_flows, get_flow_type_short(),
+                               get_traffic_rate_str()),
                         "test_p2v_{}_{}".
                         format(nr_of_flows, get_flow_type_name()),
                         phy_speed, cpu_utilization=cpu_results)
@@ -780,9 +785,9 @@ def test_p2p(nr_of_flows, packet_sizes):
     for packet_size in packet_sizes:
 
         ##################################################
-        lprint("- [TEST: {0}(flows={1}, packet_size={2})] START".
-               format(inspect.currentframe().f_code.co_name,
-                      nr_of_flows, packet_size))
+        lprint("- [TEST: {0}(flows={1}, packet_size={2}, rate={3:.3f}%))]"
+               " START".format(inspect.currentframe().f_code.co_name,
+                               nr_of_flows, packet_size, config.traffic_rate))
 
         ##################################################
         lprint("  * Create OVS OpenFlow rules...")
@@ -797,7 +802,8 @@ def test_p2p(nr_of_flows, packet_sizes):
                                         get_traffic_generator_flow(),
                                         nr_of_flows, packet_size,
                                         traffic_dst_mac=config.dst_mac_address,
-                                        traffic_src_mac=config.src_mac_address)
+                                        traffic_src_mac=config.src_mac_address,
+                                        percentage=config.traffic_rate * 10000)
 
         ##################################################
         if config.warm_up:
@@ -898,8 +904,9 @@ def test_p2p(nr_of_flows, packet_sizes):
 
     create_single_graph(packet_sizes, p2p_results,
                         "Packet size", "Packets/second",
-                        "Physical to Physical with {} {} flows".
-                        format(nr_of_flows, get_flow_type_short()),
+                        "Physical to Physical with {} {} flows{}".
+                        format(nr_of_flows, get_flow_type_short(),
+                               get_traffic_rate_str()),
                         "test_p2p_{}_{}".
                         format(nr_of_flows, get_flow_type_name()),
                         phy_speed, cpu_utilization=cpu_results)
@@ -931,9 +938,9 @@ def test_vxlan(nr_of_flows, packet_sizes):
     for packet_size in packet_sizes:
 
         ##################################################
-        lprint("- [TEST: {0}(flows={1}, packet_size={2})] START".
-               format(inspect.currentframe().f_code.co_name,
-                      nr_of_flows, packet_size))
+        lprint("- [TEST: {0}(flows={1}, packet_size={2}, rate={3:.3f}%)]"
+               " START".format(inspect.currentframe().f_code.co_name,
+                               nr_of_flows, packet_size))
 
         ##################################################
         lprint("  * Get bridge MAC address...")
@@ -964,7 +971,8 @@ def test_vxlan(nr_of_flows, packet_sizes):
                                         TrafficFlowType.vxlan_l3_ipv4,
                                         nr_of_flows, packet_size,
                                         tunnel_dst_mac=tunnel_dst_mac,
-                                        traffic_dst_mac=config.dst_mac_address)
+                                        traffic_dst_mac=config.dst_mac_address,
+                                        percentage=config.traffic_rate * 10000)
 
         ##################################################
         lprint("  * Clear all statistics...")
@@ -1053,8 +1061,9 @@ def test_vxlan(nr_of_flows, packet_sizes):
 
     create_single_graph(packet_sizes, vxlan_results,
                         "Packet size", "Packets/second",
-                        "VXLAN Tunnel with {} {} flows".
-                        format(nr_of_flows, get_flow_type_short()),
+                        "VXLAN Tunnel with {} {} flows{}".
+                        format(nr_of_flows, get_flow_type_short(),
+                               get_traffic_rate_str()),
                         "test_vxlan_{}_{}".
                         format(nr_of_flows, get_flow_type_name()),
                         phy_speed, cpu_utilization=cpu_results)
@@ -3155,6 +3164,16 @@ def get_traffic_generator_flow():
 
 
 #
+# Get traffic rate string if not 100%
+#
+def get_traffic_rate_str():
+    if config.traffic_rate < 100:
+        return ", traffic rate {:.3f}%".format(config.traffic_rate)
+
+    return ""
+
+
+#
 # Traffic tester type definitions
 #
 traffic_tester_types = ['xena', 'trex']
@@ -3329,15 +3348,20 @@ def main():
     parser.add_argument("--skip-pv-test",
                         help="Do not run the P to V test", action="store_true")
     parser.add_argument("--skip-pvp-test",
-                        help="Do not run the P to V to P test", action="store_true")
+                        help="Do not run the P to V to P test",
+                        action="store_true")
     # Removed VV test for now, as it needs non-upstream trafgen tool
     # parser.add_argument("--skip-vv-test",
     #                     help="Do not run the V to V test", action="store_true")
     parser.add_argument("--stream-list", metavar="LIST",
                         help="List of stream sizes to test", type=str,
                         default=DEFAULT_STREAM_LIST)
+    parser.add_argument("--traffic-rate", metavar="PERCENTAGE",
+                        help="Traffic rate sent by tester, default 100%%",
+                        type=float, default=100)
     parser.add_argument("--warm-up",
-                        help="Do flow warm-up round before tests", action="store_true")
+                        help="Do flow warm-up round before tests",
+                        action="store_true")
     parser.add_argument("--warm-up-timeout", metavar="SECONDS",
                         help="Warm up timeout", type=int,
                         default=DEFAULT_WARM_UP_TIMEOUT)
@@ -3556,7 +3580,12 @@ def main():
             sys.exit(-1)
 
     if config.zero_loss_step > 25 or config.zero_loss_step < 0.001:
-        lprint("ERROR: Invalid zero loss interval step size supplied (0.001..25]!")
+        lprint("ERROR: Invalid zero loss interval step size supplied "
+               "(0.001..25]!")
+        sys.exit(-1)
+
+    if config.traffic_rate > 100 or config.traffic_rate < 0.001:
+        lprint("ERROR: Invalid traffic rate configured (0.001..100]!")
         sys.exit(-1)
 
     #
@@ -3614,6 +3643,7 @@ def main():
     slogger.debug("  %-23.23s: %s", 'Warm-up', config.warm_up)
     slogger.debug("  %-23.23s: %s", 'No cool down', config.no_cool_down)
     slogger.debug("  %-23.23s: %f", 'Zero loss step', config.zero_loss_step)
+    slogger.debug("  %-23.23s: %f%%", 'Traffic rate', config.traffic_rate)
 
     #
     # If we use the GUI, we need to set the correct back-end
@@ -3758,9 +3788,11 @@ def main():
     with open(csv_file, 'w') as csvfile:
         csv_handle = csv.writer(csvfile, dialect='excel')
 
-        csv_handle.writerow(["Physical port, \"{}\", speed {} Gbit/s".
+        csv_handle.writerow(["Physical port, \"{}\", speed {} Gbit/s, "
+                             "traffic rate {}%".
                              format(config.physical_interface,
-                                    phy_speed / 1000000000)])
+                                    phy_speed / 1000000000,
+                                    config.traffic_rate)])
         csv_handle.writerow([])
         csv_handle.writerow([])
 
@@ -3813,13 +3845,15 @@ def main():
 
                 create_multiple_graph(packet_size_list, p2v_results,
                                       "Packet size", "Packets/second",
-                                      "Physical to Virtual, {}".format(flow_str),
+                                      "Physical to Virtual, {}{}".
+                                      format(flow_str, get_traffic_rate_str()),
                                       "test_p2v_all_{}".format(flow_file_str),
                                       None, cpu_utilization=p2v_cpu_results)
 
                 create_multiple_graph(packet_size_list, p2v_results,
                                       "Packet size", "Packets/second",
-                                      "Physical to Virtual, {}".format(flow_str),
+                                      "Physical to Virtual, {}{}".
+                                      format(flow_str, get_traffic_rate_str()),
                                       "test_p2v_all_{}_ref".format(flow_file_str),
                                       [phy_speed], cpu_utilization=p2v_cpu_results)
 
@@ -3835,13 +3869,15 @@ def main():
 
                 create_multiple_graph(packet_size_list, p2v2p_results,
                                       "Packet size", "Packets/second",
-                                      "Physical to Virtual to Physical, {}".format(flow_str),
+                                      "Physical to Virtual to Physical, {}{}".
+                                      format(flow_str, get_traffic_rate_str()),
                                       "test_p2v2p_all_{}".format(flow_file_str),
                                       None, cpu_utilization=p2v2p_cpu_results)
 
                 create_multiple_graph(packet_size_list, p2v2p_results,
                                       "Packet size", "Packets/second",
-                                      "Physical to Virtual to Physical, {}".format(flow_str),
+                                      "Physical to Virtual to Physical, {}{}".
+                                      format(flow_str, get_traffic_rate_str()),
                                       "test_p2v2p_all_{}_ref".format(flow_file_str),
                                       [phy_speed], cpu_utilization=p2v2p_cpu_results)
 
@@ -3857,13 +3893,15 @@ def main():
 
                 create_multiple_graph(packet_size_list, p2p_results,
                                       "Packet size", "Packets/second",
-                                      "Physical to Physical, {}".format(flow_str),
+                                      "Physical to Physical, {}{}".
+                                      format(flow_str, get_traffic_rate_str()),
                                       "test_p2p_all_{}".format(flow_file_str),
                                       None, cpu_utilization=p2p_cpu_results)
 
                 create_multiple_graph(packet_size_list, p2p_results,
                                       "Packet size", "Packets/second",
-                                      "Physical to Physical, {}".format(flow_str),
+                                      "Physical to Physical, {}{}".
+                                      format(flow_str, get_traffic_rate_str()),
                                       "test_p2p_all_{}_ref".format(flow_file_str),
                                       [phy_speed], cpu_utilization=p2p_cpu_results)
 
@@ -3890,13 +3928,15 @@ def main():
 
                 create_multiple_graph(packet_size_list, vxlan_results,
                                       "Packet size", "Packets/second",
-                                      "VXLAN Tunnel, {}".format(flow_str),
+                                      "VXLAN Tunnel, {}{}".
+                                      format(flow_str, get_traffic_rate_str()),
                                       "test_vxlan_all_{}".format(flow_file_str),
                                       None, cpu_utilization=vxlan_cpu_results)
 
                 create_multiple_graph(packet_size_list, vxlan_results,
                                       "Packet size", "Packets/second",
-                                      "VXLAN Tunnel, {}".format(flow_str),
+                                      "VXLAN Tunnel, {}{}".
+                                      format(flow_str, get_traffic_rate_str()),
                                       "test_vxlan_all_{}_ref".format(flow_file_str),
                                       [phy_speed], cpu_utilization=vxlan_cpu_results)
 
