@@ -69,6 +69,16 @@ yum -y install bc emacs gcc git lshw pciutils python-devel python-pip \
                python-setuptools tmux tuned-profiles-cpu-partitioning wget
 ```
 
+NOTE: For RHEL8 use the following _yum install_:
+
+```
+yum -y install bc emacs gcc git lshw pciutils python3-devel python3-pip \
+               python3-setuptools tmux tuned-profiles-cpu-partitioning \
+               tar wget zeromq-devel
+ln -s /usr/bin/python3 /usr/bin/python
+ln -s /usr/bin/pip3 /usr/bin/pip
+```
+
 
 ### Tweak the kernel
 Rather than using the default 2M huge pages we configure 32 1G pages. You can
@@ -77,6 +87,7 @@ needed by some of the DPDK PMD drivers used by TRex:
 
 ```
 sed -i -e 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="default_hugepagesz=1G hugepagesz=1G hugepages=32 iommu=pt intel_iommu=on /'  /etc/default/grub
+grub2-editenv - unset kernelopts
 grub2-mkconfig -o /boot/grub2/grub.cfg
 ```
 
@@ -204,9 +215,8 @@ the console if we want to:
 ```
 cd ~/trex/v2.29
 tmux
-./t-rex-64 -c 4 -i
+./t-rex-64 -c 4 -i --no-scapy-server
 ```
-
 
 
 
@@ -250,7 +260,6 @@ cd ~/trex/v2.29
 tar -xzf trex_client_v2.29.tar.gz
 cp -r trex_client/stl/trex_stl_lib/ ~/ovs_perf
 cp -r trex_client/external_libs/ ~/ovs_perf/trex_stl_lib/
-
 ```
 
 
@@ -318,12 +327,12 @@ yum -y clean all
 yum -y update
 yum -y install aspell aspell-en autoconf automake bc checkpolicy \
                desktop-file-utils dpdk-tools driverctl emacs gcc gcc-c++ gdb \
-	       git graphviz groff hwloc intltool kernel-devel libcap-ng \
-	       libcap-ng-devel libguestfs libguestfs-tools-c libtool libvirt \
-	       lshw openssl openssl-devel openvswitch procps-ng python \
-	       python-six python-twisted-core python-zope-interface \
-	       qemu-kvm-rhev rpm-build selinux-policy-devel sshpass sysstat \
-	       systemd-units tcpdump time tmux tuned-profiles-cpu-partitioning \
+               git graphviz groff hwloc intltool kernel-devel libcap-ng \
+               libcap-ng-devel libguestfs libguestfs-tools-c libtool libvirt \
+               lshw openssl openssl-devel openvswitch procps-ng python \
+               python-six python-twisted-core python-zope-interface \
+               qemu-kvm-rhev rpm-build selinux-policy-devel sshpass sysstat \
+               systemd-units tcpdump time tmux tuned-profiles-cpu-partitioning \
                virt-install virt-manager wget
 ```
 
@@ -344,6 +353,7 @@ needed by the DPDK PMD driver:
 
 ```
 sed -i -e 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="default_hugepagesz=1G hugepagesz=1G hugepages=32 iommu=pt intel_iommu=on/'  /etc/default/grub
+grub2-editenv - unset kernelopts
 grub2-mkconfig -o /boot/grub2/grub.cfg
 ```
 
@@ -403,6 +413,7 @@ command line. This can be done as follows:
 
 ```
 sed -i -e 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="isolcpus=1-13,15-27 /'  /etc/default/grub
+grub2-editenv - unset kernelopts
 grub2-mkconfig -o /boot/grub2/grub.cfg
 ```
 
@@ -650,6 +661,7 @@ section above:
 [root@localhost ~]# yum -y install driverctl gcc kernel-devel numactl-devel tuned-profiles-cpu-partitioning wget libibverbs dpdk
 [root@localhost ~]# yum -y update kernel
 [root@localhost ~]# sed -i -e 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="isolcpus=1,2,3 default_hugepagesz=1G hugepagesz=1G hugepages=2 /'  /etc/default/grub
+[root@localhost ~]# grub2-editenv - unset kernelopts
 [root@localhost ~]# grub2-mkconfig -o /boot/grub2/grub.cfg
 [root@localhost ~]# echo "options vfio enable_unsafe_noiommu_mode=1" > /etc/modprobe.d/vfio.conf
 [root@localhost ~]# driverctl -v set-override 0000:00:02.0 vfio-pci
