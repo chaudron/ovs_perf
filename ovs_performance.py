@@ -1563,10 +1563,10 @@ def create_ovs_l2_of_rules(number_of_flows, src_port, dst_port, **kwargs):
     lprint("  * Create {} L2 OpenFlow rules...".format(number_of_flows))
 
     cmd = "python -c 'for i in range({4}, {0}): " \
-          "print \"add in_port={2}," \
+          "print(\"add in_port={2}," \
           "dl_dst={{0:02x}}:{{1:02x}}:{{2:02x}}:{{3:02x}}:{{4:02x}}:{{5:02x}}," \
           "action={3}\".format((i >> 40) & 0xff, (i >> 32) & 0xff, (i >> 24) " \
-          "& 0xff, (i >> 16) & 0xff, (i >> 8) & 0xff, i & 0xff)'" \
+          "& 0xff, (i >> 16) & 0xff, (i >> 8) & 0xff, i & 0xff))'" \
           " | ovs-ofctl add-flow {1} -". \
           format(number_of_flows + base_mac, config.bridge_name,
                  src_port, dst_port, base_mac)
@@ -1661,13 +1661,13 @@ def create_ovs_l3_of_rules(number_of_flows, src_port, dst_port, **kwargs):
     lprint("  * Create {} L3 OpenFlow rules...".format(number_of_flows))
 
     cmd = "python -c 'for i in range({4}, {0}): " \
-          "print \"add in_port={2}," \
+          "print(\"add in_port={2}," \
           "eth_type(0x800),nw_src={{}}.{{}}.{{}}.{{}},nw_dst={{}}.{{}}.{{}}.{{}}," \
           "action={3}\".format(" \
           "(i >> 24) & 0xff, (i >> 16) & 0xff," \
           "(i >> 8) & 0xff, i & 0xff," \
           "((i + 0x01000000) >> 24) & 0xff, ((i + 0x01000000) >> 16) & 0xff," \
-          "((i + 0x01000000) >> 8) & 0xff, (i + 0x01000000)  & 0xff)'" \
+          "((i + 0x01000000) >> 8) & 0xff, (i + 0x01000000)  & 0xff))'" \
           " | ovs-ofctl add-flow {1} -". \
           format(number_of_flows + ip_start_offset, config.bridge_name,
                  src_port, dst_port, ip_start_offset)
@@ -1750,9 +1750,9 @@ def create_ovs_l3_of_slash_16_rules(number_of_flows,
     lprint("  * Create {} L3 /16 OpenFlow rules...".format(number_of_flows))
 
     cmd = "python -c 'for i in range(0, {0}): " \
-          "print \"add in_port={2}," \
+          "print(\"add in_port={2}," \
           "eth_type(0x800),nw_src=1.{{0}}.0.0/16,nw_dst=2.{{0}}.0.0/16," \
-          "action={3}\".format(i)'" \
+          "action={3}\".format(i))'" \
           " | ovs-ofctl add-flow {1} -". \
           format(number_of_flows, config.bridge_name,
                  src_port, dst_port)
@@ -1800,9 +1800,9 @@ def create_ovs_l4_of_rules(number_of_flows, src_port, dst_port, **kwargs):
     lprint("  * Create {} L4 OpenFlow rules...".format(number_of_flows))
 
     cmd = "python -c 'for i in range(0, {0}): " \
-          "print \"add in_port={2}," \
+          "print(\"add in_port={2}," \
           "udp,udp_src={{0}},udp_dst={{0}}," \
-          "action={3}\".format(i)'" \
+          "action={3}\".format(i))'" \
           " | ovs-ofctl add-flow {1} -". \
           format(number_of_flows, config.bridge_name,
                  src_port, dst_port)
