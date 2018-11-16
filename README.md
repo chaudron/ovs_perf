@@ -14,7 +14,7 @@ For more details on the PVP test, take a look at the following blog post,
 
 
 This setup tutorial needs two machines with Red Hat Enterprise Linux, in this
-example, we use version 7.3. One machine will be used as a traffic generator
+example, we use version 8.0 BETA. One machine will be used as a traffic generator
 using TRex, the other one will be the DUT running Open vSwitch. We use two
 Intel 82599ES 10G adapters to interconnect the machines. The script will take
 care of performing the tests with different packet sizes, and set of different
@@ -37,18 +37,12 @@ or newer CPU. Also, do not forget to enable VT-d in the BIOS
 
 
 ### Register Red Hat Enterprise Linux
-We continue here right after installing Red Hat Enterprise Linux. First need to
+We continue here right after installing Red Hat Enterprise Linux 8.0 BETA. First need to
 register the system, so we can download all the packages we need:
 
 ```
-# subscription-manager register
-Registering to: subscription.rhsm.redhat.com:443/subscription
-Username: user@domain.com
-Password:
-The system has been registered with ID: xxxxxxxx-xxxx-xxxx-xxxxxxxxxxxxxxxxxx
-
-# subscription-manager attach --pool=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-Successfully attached a subscription for: xxxxxxxxxxxxxxxxxx
+subscription-manager register --username=<user> --password=<password> --baseurl=cdn.stage.redhat.com --serverurl subscription.rhsm.stage.redhat.com
+subscription-manager attach --pool=<pool_id>
 ```
 
 
@@ -61,15 +55,6 @@ yum -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarc
 
 
 Now we can install the packages we need:
-
-```
-yum -y clean all
-yum -y update
-yum -y install bc emacs gcc git lshw pciutils python-devel python-pip \
-               python-setuptools tmux tuned-profiles-cpu-partitioning wget
-```
-
-NOTE: For RHEL8 use the following _yum install_:
 
 ```
 yum -y install bc emacs gcc git lshw pciutils python3-devel python3-pip \
@@ -277,39 +262,18 @@ redo the configuration to use the Linux kernel datapath.
 As with the TRex system we first need to register the system:
 
 ```
-# subscription-manager register
-Registering to: subscription.rhsm.redhat.com:443/subscription
-Username: user@domain.com
-Password:
-The system has been registered with ID: xxxxxxxx-xxxx-xxxx-xxxxxxxxxxxxxxxxxx
-
-# subscription-manager attach --pool=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-Successfully attached a subscription for: xxxxxxxxxxxxxxxxxx
+subscription-manager register --username=<user> --password=<password> --baseurl=cdn.stage.redhat.com --serverurl subscription.rhsm.stage.redhat.com
+subscription-manager attach --pool=<pool_id>
 ```
 
 
 ### Add the packages we need
-We need _"Red Hat Enterprise Linux Fast Datapath 7"_ for Open vSwitch,
-and _"Red Hat Virtualization 4"_ for Qemu. If you do not have access to these
-repositories, please contact your Red Had representative.
+We need _"Red Hat Enterprise Linux Fast Datapath Beta"_ for Open vSwitch,
+If you do not have access to these repositories, please contact your Red Had
+representative.
 
 ```
-subscription-manager repos --enable=rhel-7-fast-datapath-rpms
-subscription-manager repos --enable=rhel-7-server-rhv-4-mgmt-agent-rpms
-subscription-manager repos --enable rhel-7-server-extras-rpms
-subscription-manager repos --enable rhel-7-server-optional-rpms
-```
-
-__NOTE__: If the above gives an error, follow procedure at: https://access.redhat.com/solutions/3006821, basically:
-
-```
-subscription-manager unsubscribe --all
-yum clean all
-subscription-manager attach
-subscription-manager repos --disable="*"
-subscription-manager repos \
---enable="rhel-7-server-extras-rpms" \
---enable="rhel-7-fast-datapath-rpms"
+<subscription-manager repos --enable fast-datapath-beta-for-rhel-8-x86_64-rpms
 ```
 
 
@@ -327,11 +291,11 @@ yum -y clean all
 yum -y update
 yum -y install aspell aspell-en autoconf automake bc checkpolicy \
                desktop-file-utils dpdk-tools driverctl emacs gcc gcc-c++ gdb \
-               git graphviz groff hwloc intltool kernel-devel libcap-ng \
+               git graphviz hwloc intltool kernel-devel libcap-ng \
                libcap-ng-devel libguestfs libguestfs-tools-c libtool libvirt \
-               lshw openssl openssl-devel openvswitch procps-ng python \
-               python-six python-twisted-core python-zope-interface \
-               qemu-kvm-rhev rpm-build selinux-policy-devel sshpass sysstat \
+               lshw openssl openssl-devel openvswitch2.10 procps-ng python3 \
+               python3-six \
+               rpm-build selinux-policy-devel sshpass sysstat \
                systemd-units tcpdump time tmux tuned-profiles-cpu-partitioning \
                virt-install virt-manager wget
 ```
@@ -518,17 +482,18 @@ ovs-vsctl add-port ovs_pvp_br0 vhost0 -- \
 ### Create the loopback Virtual Machine
 <a name="CreateLoopbackVM"/>
 
-Get the [Red Hat Enterprise Linux 7.5 KVM Guest Image](https://access.redhat.com/downloads/content/69/ver=/rhel---7/7.5/x86_64/product-software).
+Get the Red Hat Enterprise Linux 8 Beta KVM Guest Image.
 If you do not have access to the image please contact your Red Had
 representative. Copy the image for use by qemu:
 
 ```
-# ls -l ~/*.qcow2
--rw-r--r--. 1 root root 556247552 Jul 13 06:10 rhel-server-7.5-x86_64-kvm.qcow2
+# ls ~/*.qcow2
+rhel-guest-image-8.0-1682.x86_64.qcow2
 ```
+
 ```
 mkdir -p /opt/images
-cp ~/rhel-server-7.5-x86_64-kvm.qcow2 /opt/images
+cp ~/rhel-guest-image-8.0-1682.x86_64.qcow2 /opt/images
 ```
 
 If you are running Open vSwitch version 2.9 or later it will be started as
@@ -556,7 +521,7 @@ Setup as much as possible with a single call to _virt-install_:
   --network vhostuser,source_type=unix,source_path=/tmp/vhost-sock0,source_mode=server,model=virtio,driver_queues=2 \
   --network network=default \
   --name=rhel_loopback \
-  --disk path=/opt/images/rhel-server-7.5-x86_64-kvm.qcow2,format=qcow2 \
+  --disk path=/opt/images/rhel-guest-image-8.0-1682.x86_64.qcow2,format=qcow2 \
   --ram 8192 \
   --memorybacking hugepages=on,size=1024,unit=M,nodeset=0 \
   --vcpus=4,cpuset=3,4,5,6 \
@@ -564,8 +529,7 @@ Setup as much as possible with a single call to _virt-install_:
   --cpu Haswell-noTSX,+pdpe1gb,cell0.id=0,cell0.cpus=0,cell0.memory=8388608 \
   --numatune mode=strict,nodeset=0 \
   --nographics --noautoconsole \
-  --import \
-  --os-variant=rhel7
+  --import
 ```
 
 If you have a multi-NUMA system and you are not on NUMA node 0, you need to
@@ -621,13 +585,10 @@ network manager, and the cloud configuration removed on the next boot:
 ```
 # LIBGUESTFS_BACKEND=direct virt-customize -d rhel_loopback \
   --root-password password:root \
-  --firstboot-command 'rm /etc/systemd/system/multi-user.target.wants/cloud-config.service' \
-  --firstboot-command 'rm /etc/systemd/system/multi-user.target.wants/cloud-final.service' \
-  --firstboot-command 'rm /etc/systemd/system/multi-user.target.wants/cloud-init-local.service' \
-  --firstboot-command 'rm /etc/systemd/system/multi-user.target.wants/cloud-init.service' \
+  --uninstall cloud-init \
   --firstboot-command 'nmcli c | grep -o --  "[0-9a-fA-F]\{8\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{12\}" | xargs -n 1 nmcli c delete uuid' \
-  --firstboot-command 'nmcli con add con-name ovs-dpdk ifname eth0 type ethernet ip4 1.1.1.1/24' \
-  --firstboot-command 'nmcli con add con-name management ifname eth1 type ethernet' \
+  --firstboot-command 'nmcli con add con-name ovs-dpdk ifname ens2 type ethernet ip4 1.1.1.1/24' \
+  --firstboot-command 'nmcli con add con-name management ifname ens3 type ethernet' \
   --firstboot-command 'reboot'
 ```
 
@@ -652,37 +613,26 @@ beginning of the [Setup the Device Under Test (DUT), Open vSwitch](#DUTsetup)
 section above:
 
 ```
-[root@localhost ~]# subscription-manager register
-[root@localhost ~]# subscription-manager attach --pool=xxxxxxxxxxxxxxxxxxxxxxxxx
-[root@localhost ~]# subscription-manager repos --enable=rhel-7-fast-datapath-rpms
-[root@localhost ~]# subscription-manager repos --enable=rhel-7-server-extras-rpms
-[root@localhost ~]# yum -y clean all
-[root@localhost ~]# yum -y update
-[root@localhost ~]# yum -y install driverctl gcc kernel-devel numactl-devel tuned-profiles-cpu-partitioning wget libibverbs dpdk
-[root@localhost ~]# yum -y update kernel
-[root@localhost ~]# sed -i -e 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="isolcpus=1,2,3 default_hugepagesz=1G hugepagesz=1G hugepages=2 /'  /etc/default/grub
-[root@localhost ~]# grub2-editenv - unset kernelopts
-[root@localhost ~]# grub2-mkconfig -o /boot/grub2/grub.cfg
-[root@localhost ~]# echo "options vfio enable_unsafe_noiommu_mode=1" > /etc/modprobe.d/vfio.conf
-[root@localhost ~]# driverctl -v set-override 0000:00:02.0 vfio-pci
-[root@localhost ~]# systemctl enable tuned
-[root@localhost ~]# systemctl start tuned
-[root@localhost ~]# echo isolated_cores=1,2,3 >> /etc/tuned/cpu-partitioning-variables.conf
-[root@localhost ~]# tuned-adm profile cpu-partitioning
-[root@localhost ~]# reboot
+subscription-manager register --username=<user> --password=<password> \
+  --baseurl=cdn.stage.redhat.com --serverurl subscription.rhsm.stage.redhat.com
+subscription-manager attach --pool=<pool_id>
+subscription-manager repos --enable fast-datapath-beta-for-rhel-8-x86_64-rpms
+yum -y clean all
+yum -y update
+yum -y install driverctl gcc kernel-devel numactl-devel tuned-profiles-cpu-partitioning wget libibverbs dpdk
+yum -y update kernel
+sed -i -e 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="isolcpus=1,2,3 default_hugepagesz=1G hugepagesz=1G hugepages=2 /'  /etc/default/grub
+grub2-editenv - unset kernelopts
+grub2-mkconfig -o /boot/grub2/grub.cfg
+echo "options vfio enable_unsafe_noiommu_mode=1" > /etc/modprobe.d/vfio.conf
+driverctl -v set-override 0000:00:02.0 vfio-pci
+systemctl enable tuned
+systemctl start tuned
+echo isolated_cores=1,2,3 >> /etc/tuned/cpu-partitioning-variables.conf
+tuned-adm profile cpu-partitioning
+reboot
 ```
 
-__NOTE__: If the above registration for the _rhel-7-fast-datapath-rpms_ gives an error, follow procedure at: https://access.redhat.com/solutions/3006821, basically:
-
-```
-subscription-manager unsubscribe --all
-yum clean all
-subscription-manager attach
-subscription-manager repos --disable="*"
-subscription-manager repos \
---enable="rhel-7-server-extras-rpms" \
---enable="rhel-7-fast-datapath-rpms"
-```
 
 You can quickly check if your VM is setup correctly by starting _testpmd_ as
 follows:
@@ -1810,7 +1760,7 @@ above, however, make an additional copy of the VM image:
 
 ```
 mkdir -p /opt/images
-cp ~/rhel-server-7.5-x86_64-kvm.qcow2 /opt/images/rhel-server-7.5-x86_64-kvm-tc.qcow2
+cp ~/rhel-guest-image-8.0-1682.x86_64.qcow2 /opt/images/rhel-guest-image-8.0-1682.x86_64-kvm-tc.qcow2
 ```
 
 and replace the _virt-install_ command with the following one:
@@ -1821,15 +1771,14 @@ and replace the _virt-install_ command with the following one:
   --host-device 03:08.0,driver_name=vfio \
   --network network=default \
   --name=rhel_loopback_tcflower \
-  --disk path=/opt/images/rhel-server-7.5-x86_64-kvm-tc.qcow2,format=qcow2 \
+  --disk path=/opt/images/rhel-guest-image-8.0-1682.x86_64-kvm-tc.qcow2,format=qcow2 \
   --ram 8192 \
   --vcpus=4,cpuset=3,4,5,6 \
   --check-cpu \
   --cpu Haswell-noTSX,+pdpe1gb,cell0.id=0,cell0.cpus=0,cell0.memory=8388608 \
   --numatune mode=strict,nodeset=0 \
   --nographics --noautoconsole \
-  --import \
-  --os-variant=rhel7
+  --import
 ```
 
 __NOTE__: The PCI address is that of the Virtual Function exposed by the network
@@ -1841,13 +1790,10 @@ and name change:
 ```
 # LIBGUESTFS_BACKEND=direct virt-customize -d rhel_loopback_tcflower \
   --root-password password:root \
-  --firstboot-command 'rm /etc/systemd/system/multi-user.target.wants/cloud-config.service' \
-  --firstboot-command 'rm /etc/systemd/system/multi-user.target.wants/cloud-final.service' \
-  --firstboot-command 'rm /etc/systemd/system/multi-user.target.wants/cloud-init-local.service' \
-  --firstboot-command 'rm /etc/systemd/system/multi-user.target.wants/cloud-init.service' \
+  --uninstall cloud-init \
   --firstboot-command 'nmcli c | grep -o --  "[0-9a-fA-F]\{8\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{12\}" | xargs -n 1 nmcli c delete uuid' \
-  --firstboot-command 'nmcli con add con-name ovs-vf ifname eth0 type ethernet ip4 1.1.1.1/24' \
-  --firstboot-command 'nmcli con add con-name management ifname eth1 type ethernet' \
+  --firstboot-command 'nmcli con add con-name ovs-dpdk ifname ens2 type ethernet ip4 1.1.1.1/24' \
+  --firstboot-command 'nmcli con add con-name management ifname ens3 type ethernet' \
   --firstboot-command 'reboot'
 ```
 
@@ -2083,15 +2029,14 @@ above, however, replace the _virt-install_ command with the following one:
   --host-device 05:00.3,driver_name=vfio \
   --network network=default \
   --name=rhel_loopback_cpdpoffload \
-  --disk path=/opt/images/rhel-server-7.5-x86_64-kvm.qcow2,format=qcow2 \
+  --disk path=/opt/images/rhel-guest-image-8.0-1682.x86_64.qcow2,format=qcow2 \
   --ram 8192 \
   --vcpus=4,cpuset=3,4,5,6 \
   --check-cpu \
   --cpu Haswell-noTSX,+pdpe1gb,cell0.id=0,cell0.cpus=0,cell0.memory=8388608 \
   --numatune mode=strict,nodeset=0 \
   --nographics --noautoconsole \
-  --import \
-  --os-variant=rhel7
+  --import
 ```
 
 __NOTE__: The PCI address is that of the Virtual Function exposed by the network
@@ -2103,13 +2048,10 @@ and name change:
 ```
 # LIBGUESTFS_BACKEND=direct virt-customize -d rhel_loopback_cpdpoffload \
   --root-password password:root \
-  --firstboot-command 'rm /etc/systemd/system/multi-user.target.wants/cloud-config.service' \
-  --firstboot-command 'rm /etc/systemd/system/multi-user.target.wants/cloud-final.service' \
-  --firstboot-command 'rm /etc/systemd/system/multi-user.target.wants/cloud-init-local.service' \
-  --firstboot-command 'rm /etc/systemd/system/multi-user.target.wants/cloud-init.service' \
+  --uninstall cloud-init \
   --firstboot-command 'nmcli c | grep -o --  "[0-9a-fA-F]\{8\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{12\}" | xargs -n 1 nmcli c delete uuid' \
-  --firstboot-command 'nmcli con add con-name ovs-vf ifname eth0 type ethernet ip4 1.1.1.1/24' \
-  --firstboot-command 'nmcli con add con-name management ifname eth1 type ethernet' \
+  --firstboot-command 'nmcli con add con-name ovs-dpdk ifname ens2 type ethernet ip4 1.1.1.1/24' \
+  --firstboot-command 'nmcli con add con-name management ifname ens3 type ethernet' \
   --firstboot-command 'reboot'
 ```
 
