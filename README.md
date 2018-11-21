@@ -298,6 +298,8 @@ yum -y install aspell aspell-en autoconf automake bc checkpolicy \
                rpm-build selinux-policy-devel sshpass sysstat \
                systemd-units tcpdump time tmux tuned-profiles-cpu-partitioning \
                virt-install virt-manager wget
+ln -s /usr/bin/python3 /usr/bin/python
+ln -s /usr/bin/pip3 /usr/bin/pip
 ```
 
 
