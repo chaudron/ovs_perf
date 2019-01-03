@@ -76,8 +76,10 @@ class DutSshShell(SshShell):
             pass
 
         self.logger.debug("RETURN: {}".format(result.return_code))
-        self.logger.debug("STDOUT: >>{}<<END".format(result.stdout_output))
-        self.logger.debug("STDERR: >>{}<<END".format(result.stderr_output))
+        self.logger.debug("STDOUT: >>{}<<END".format(
+            result.stdout_output.encode('utf-8')))
+        self.logger.debug("STDERR: >>{}<<END".format(
+            result.stderr_output.encode('utf-8')))
 
         if result.return_code != 0 and die_on_error == True:
             print(("ERROR[%d]: Failed executing command, \"%s\", on DUT \"%s\""

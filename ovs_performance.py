@@ -1183,13 +1183,15 @@ def start_traffic_rx_on_vm(vm, pci):
     pmd_cpu_mask = cpu_mask & ~0x1
     disable_hw_vlan = " --disable-hw-vlan" if vm_dpdk_version < \
                       StrictVersion('18.2.0') else ""
+    legacy_mem= " --legacy-mem" if vm_dpdk_version >= \
+                      StrictVersion('18.11.0') else ""
 
     cmd = r"sshpass -p {2} ssh -o UserKnownHostsFile=/dev/null " \
           r"-o StrictHostKeyChecking=no -n {1}@{0} " \
           r"'rm -f ~/results.txt; " \
           r" nohup sh -c " \
           r' "(while sleep 1; do echo show port stats 0; done | ' \
-          r" testpmd -c {5:x} -n 4 --socket-mem 2048,0 -w {3} -- "\
+          r" testpmd -c {5:x} -n 4 --socket-mem 2048,0 -w {3}{10} -- "\
           r" --burst 64 -i --rxq={4} --txq={4} --rxd={8} " \
           r" --txd={9} --auto-start --forward-mode=rxonly " \
           r' --port-topology=chained --coremask={6:x}{7})" ' \
@@ -1197,7 +1199,7 @@ def start_traffic_rx_on_vm(vm, pci):
           format(vm, config.dut_vm_user, config.dut_vm_password, pci,
                  config.dut_vm_nic_queues, cpu_mask, pmd_cpu_mask,
                  disable_hw_vlan, config.dut_vm_nic_rxd,
-                 config.dut_vm_nic_txd)
+                 config.dut_vm_nic_txd, legacy_mem)
 
     dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd], die_on_error=True)
     time.sleep(2)
@@ -1211,7 +1213,8 @@ def stop_traffic_rx_on_vm(vm, **kwargs):
 
     cmd = r"sshpass -p {2} ssh -o UserKnownHostsFile=/dev/null " \
           r"-o StrictHostKeyChecking=no -n {1}@{0} " \
-          r"'kill -SIGINT `pidof testpmd`'". \
+          r"'TESTPMD_PID=$(pidof testpmd); kill -SIGINT $TESTPMD_PID; " \
+          r"timeout 4 tail --pid=$TESTPMD_PID -f /dev/null'". \
           format(vm, config.dut_vm_user, config.dut_vm_password)
 
     dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd], die_on_error=die)
@@ -1226,13 +1229,15 @@ def start_traffic_loop_on_vm(vm, pci):
     mac_swap = " --forward-mode=macswap" if config.mac_swap else ""
     disable_hw_vlan = " --disable-hw-vlan" if vm_dpdk_version < \
                       StrictVersion('18.2.0') else ""
+    legacy_mem= " --legacy-mem" if vm_dpdk_version >= \
+                      StrictVersion('18.11.0') else ""
 
     cmd = r"sshpass -p {2} ssh -o UserKnownHostsFile=/dev/null " \
           r"-o StrictHostKeyChecking=no -n {1}@{0} " \
           r"'rm -f ~/results.txt; " \
           r" nohup sh -c " \
           r' "(while sleep 1; do echo show port stats 0; done | ' \
-          r" testpmd -c {5:x} -n 4 --socket-mem 2048,0 -w {3} -- "\
+          r" testpmd -c {5:x} -n 4 --socket-mem 2048,0 -w {3}{11} -- "\
           r" --burst 64 -i --rxq={4} --txq={4} --rxd={9} " \
           r" --txd={10} --coremask={6:x} --auto-start " \
           r' --port-topology=chained{7}{8})" ' \
@@ -1240,7 +1245,7 @@ def start_traffic_loop_on_vm(vm, pci):
           format(vm, config.dut_vm_user, config.dut_vm_password, pci,
                  config.dut_vm_nic_queues, cpu_mask, pmd_cpu_mask,
                  mac_swap, disable_hw_vlan, config.dut_vm_nic_rxd,
-                 config.dut_vm_nic_txd)
+                 config.dut_vm_nic_txd, legacy_mem)
 
     dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd], die_on_error=True)
     time.sleep(2)
