@@ -581,7 +581,7 @@ def test_p2v2p_zero_loss(stream_size_list, packet_size_list, **kwargs):
                               test_results[nr_of_streams][packet_size]
                               ["rx_packets_second"]))
             else:
-                test_results[nr_of_streams][packet_size] = results[1]
+                test_results[nr_of_streams][packet_size] = results[min(results)]
                 lprint("  ! Zero pkt loss for {} bytes, NOT reached!!".
                        format(packet_size))
 
