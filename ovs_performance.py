@@ -1184,7 +1184,7 @@ def start_traffic_rx_on_vm(vm, pci):
     disable_hw_vlan = " --disable-hw-vlan" if vm_dpdk_version < \
                       StrictVersion('18.2.0') else ""
     legacy_mem= " --legacy-mem" if vm_dpdk_version >= \
-                      StrictVersion('18.11.0') else ""
+                      StrictVersion('18.5.0') else ""
 
     cmd = r"sshpass -p {2} ssh -o UserKnownHostsFile=/dev/null " \
           r"-o StrictHostKeyChecking=no -n {1}@{0} " \
@@ -1230,7 +1230,7 @@ def start_traffic_loop_on_vm(vm, pci):
     disable_hw_vlan = " --disable-hw-vlan" if vm_dpdk_version < \
                       StrictVersion('18.2.0') else ""
     legacy_mem= " --legacy-mem" if vm_dpdk_version >= \
-                      StrictVersion('18.11.0') else ""
+                      StrictVersion('18.5.0') else ""
 
     cmd = r"sshpass -p {2} ssh -o UserKnownHostsFile=/dev/null " \
           r"-o StrictHostKeyChecking=no -n {1}@{0} " \
