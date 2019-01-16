@@ -346,7 +346,6 @@ def test_p2v2p_single_packet_size(nr_of_flows, packet_size, **kwargs):
     decrease_rate *= 10000
 
     results = dict()
-    warm_up_done = False
 
     ##################################################
     lprint("- [TEST: {0}(flows={1}, packet_size={2}, rate={3:.2f}%)] START".
@@ -382,11 +381,7 @@ def test_p2v2p_single_packet_size(nr_of_flows, packet_size, **kwargs):
                                       config.warm_up_timeout)
         tester.stop_traffic(config.tester_interface)
 
-        if not warm_up_done:
-            if config.warm_up_no_fail:
-                stop_traffic_loop_on_vm(config.dut_vm_address)
-                flow_table_cool_down()
-            else:
+        if not warm_up_done and not config.warm_up_no_fail:
                 sys.exit(-1)
 
     ##################################################
@@ -399,7 +394,7 @@ def test_p2v2p_single_packet_size(nr_of_flows, packet_size, **kwargs):
         = get_of_port_packet_stats(of_interfaces[config.virtual_interface])
 
     ##################################################
-    if not config.warm_up or not warm_up_done:
+    if not config.warm_up:
         lprint("  * Start packet receiver on VM...")
         start_traffic_loop_on_vm(config.dut_vm_address,
                                  config.dut_vm_nic_pci)
@@ -640,7 +635,6 @@ def test_p2v(nr_of_flows, packet_sizes):
 
     p2v_results = list()
     cpu_results = list()
-    warm_up_done = False
 
     for packet_size in packet_sizes:
 
@@ -670,10 +664,7 @@ def test_p2v(nr_of_flows, packet_sizes):
             tester.start_traffic(config.tester_interface)
             warm_up_done = warm_up_verify(nr_of_flows, config.warm_up_timeout)
             tester.stop_traffic(config.tester_interface)
-            if not warm_up_done:
-                if config.warm_up_no_fail:
-                    flow_table_cool_down()
-                else:
+            if not warm_up_done and not config.warm_up_no_fail:
                     sys.exit(-1)
 
         ##################################################
@@ -780,7 +771,6 @@ def test_p2p(nr_of_flows, packet_sizes):
 
     p2p_results = list()
     cpu_results = list()
-    warm_up_done = False
 
     for packet_size in packet_sizes:
 
@@ -811,11 +801,8 @@ def test_p2p(nr_of_flows, packet_sizes):
             tester.start_traffic(config.tester_interface)
             warm_up_done = warm_up_verify(nr_of_flows, config.warm_up_timeout)
             tester.stop_traffic(config.tester_interface)
-            if not warm_up_done:
-                if config.warm_up_no_fail:
-                    flow_table_cool_down()
-                else:
-                    sys.exit(-1)
+            if not warm_up_done and not config.warm_up_no_fail:
+                sys.exit(-1)
 
         ##################################################
         lprint("  * Clear all statistics...")
