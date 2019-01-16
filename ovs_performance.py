@@ -3566,6 +3566,12 @@ def main():
     if config.warm_up and (not config.skip_vv_test or config.run_vxlan_test):
         lprint("WARNING: Warm-up only works for P2P, P2V, and P2V2P tests!")
 
+    if config.warm_up and config.flow_rule_type != "flows" and \
+       not config.warm_up_no_fail:
+            lprint("ERROR: --warm-up for none --flow-rule-type \"flows\" MUST "
+                   "be configured with --warm-up-no-fail!")
+            sys.exit(-1)
+
     if config.flow_rule_type == 'NORMAL' and not config.mac_swap:
             lprint("ERROR: The NORMAL flow rule type requires the --mac-swap "
                    "option!")
