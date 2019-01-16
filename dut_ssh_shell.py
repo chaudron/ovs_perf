@@ -1,4 +1,4 @@
-#  Copyright 2017 "OVS Performance" Authors
+#  Copyright 2017-2019 "OVS Performance" Authors
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -81,12 +81,15 @@ class DutSshShell(SshShell):
         self.logger.debug("STDERR: >>{}<<END".format(
             result.stderr_output.encode('utf-8')))
 
-        if result.return_code != 0 and die_on_error == True:
+        if result.return_code != 0 and die_on_error is True:
             print(("ERROR[%d]: Failed executing command, \"%s\", on DUT \"%s\""
                    % (result.return_code, " ".join(command), self._hostname)))
             sys.exit(-1)
 
         return result
+
+    def dut_exec_shell(self, cmd, **kwargs):
+        return self.dut_exec("", raw_cmd=['sh', '-c', cmd], **kwargs)
 
     @property
     def logger(self):
