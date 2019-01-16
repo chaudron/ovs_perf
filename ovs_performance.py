@@ -1162,6 +1162,20 @@ def of_dump_port_to_logfile(bridge):
 
 
 #
+# Static definition of a script to wait for testpmd CPU >= 150
+#
+DELAY_TEST_PMD = r'for i in {1..30}; do ' \
+                 r'  TEST_PMD_LOAD=$(top -b -n 2 -d 1 -p $(pidof testpmd) | ' \
+                 r'                  tail -1 | awk "{\$1=\$1;print}" | ' \
+                 r'                  tr -s " " | cut -d " " -f 9); ' \
+                 r'  TEST_PMD_LOAD=${TEST_PMD_LOAD%%.*}; ' \
+                 r'  if [[ $TEST_PMD_LOAD -ge "150" ]]; then ' \
+                 r'    break; ' \
+                 r'  fi ' \
+                 r'done'
+
+
+#
 # Start packet receive application on VM
 #
 def start_traffic_rx_on_vm(vm, pci):
@@ -1170,8 +1184,9 @@ def start_traffic_rx_on_vm(vm, pci):
     pmd_cpu_mask = cpu_mask & ~0x1
     disable_hw_vlan = " --disable-hw-vlan" if vm_dpdk_version < \
                       StrictVersion('18.2.0') else ""
-    legacy_mem= " --legacy-mem" if vm_dpdk_version >= \
-                      StrictVersion('18.5.0') else ""
+    legacy_mem = " --legacy-mem" if vm_dpdk_version >= \
+                 StrictVersion('18.5.0') else ""
+    auto_delay = DELAY_TEST_PMD if config.testpmd_startup_delay == 0 else ""
 
     cmd = r"sshpass -p {2} ssh -o UserKnownHostsFile=/dev/null " \
           r"-o StrictHostKeyChecking=no -n {1}@{0} " \
@@ -1182,14 +1197,15 @@ def start_traffic_rx_on_vm(vm, pci):
           r" --burst 64 -i --rxq={4} --txq={4} --rxd={8} " \
           r" --txd={9} --auto-start --forward-mode=rxonly " \
           r' --port-topology=chained --coremask={6:x}{7})" ' \
-          r" &>results.txt &'". \
+          r" &>results.txt &{11}'". \
           format(vm, config.dut_vm_user, config.dut_vm_password, pci,
                  config.dut_vm_nic_queues, cpu_mask, pmd_cpu_mask,
                  disable_hw_vlan, config.dut_vm_nic_rxd,
-                 config.dut_vm_nic_txd, legacy_mem)
+                 config.dut_vm_nic_txd, legacy_mem, auto_delay)
 
-    dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd], die_on_error=True)
-    time.sleep(2)
+    dut_shell.dut_exec_shell(cmd, die_on_error=True)
+    if config.testpmd_startup_delay > 0:
+        time.sleep(config.testpmd_startup_delay)
 
 
 #
@@ -1216,8 +1232,9 @@ def start_traffic_loop_on_vm(vm, pci):
     mac_swap = " --forward-mode=macswap" if config.mac_swap else ""
     disable_hw_vlan = " --disable-hw-vlan" if vm_dpdk_version < \
                       StrictVersion('18.2.0') else ""
-    legacy_mem= " --legacy-mem" if vm_dpdk_version >= \
-                      StrictVersion('18.5.0') else ""
+    legacy_mem = " --legacy-mem" if vm_dpdk_version >= \
+                 StrictVersion('18.5.0') else ""
+    auto_delay = DELAY_TEST_PMD if config.testpmd_startup_delay == 0 else ""
 
     cmd = r"sshpass -p {2} ssh -o UserKnownHostsFile=/dev/null " \
           r"-o StrictHostKeyChecking=no -n {1}@{0} " \
@@ -1228,14 +1245,15 @@ def start_traffic_loop_on_vm(vm, pci):
           r" --burst 64 -i --rxq={4} --txq={4} --rxd={9} " \
           r" --txd={10} --coremask={6:x} --auto-start " \
           r' --port-topology=chained{7}{8})" ' \
-          r" &>results.txt &'". \
+          r" &>results.txt &{12}'". \
           format(vm, config.dut_vm_user, config.dut_vm_password, pci,
                  config.dut_vm_nic_queues, cpu_mask, pmd_cpu_mask,
                  mac_swap, disable_hw_vlan, config.dut_vm_nic_rxd,
-                 config.dut_vm_nic_txd, legacy_mem)
+                 config.dut_vm_nic_txd, legacy_mem, auto_delay)
 
-    dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd], die_on_error=True)
-    time.sleep(2)
+    dut_shell.dut_exec_shell(cmd, die_on_error=True)
+    if config.testpmd_startup_delay > 0:
+        time.sleep(config.testpmd_startup_delay)
 
 
 #
@@ -3344,10 +3362,15 @@ def main():
                         action="store_true")
     # Removed VV test for now, as it needs non-upstream trafgen tool
     # parser.add_argument("--skip-vv-test",
-    #                     help="Do not run the V to V test", action="store_true")
+    #                     help="Do not run the V to V test",
+    #                     action="store_true")
     parser.add_argument("--stream-list", metavar="LIST",
                         help="List of stream sizes to test", type=str,
                         default=DEFAULT_STREAM_LIST)
+    parser.add_argument("--testpmd-startup-delay", metavar="SECONDS",
+                        help="Time to wait before testpmd is ready to forward,"
+                        " 0 = auto (waits for CPU > 150%), default 0",
+                        type=int, default=0)
     parser.add_argument("--traffic-rate", metavar="PERCENTAGE",
                         help="Traffic rate sent by tester, default 100%%",
                         type=float, default=100)
@@ -3358,7 +3381,8 @@ def main():
                         help="Warm up timeout", type=int,
                         default=DEFAULT_WARM_UP_TIMEOUT)
     parser.add_argument("--warm-up-no-fail",
-                        help="Continue running the test even if warm up times out", action="store_true")
+                        help="Continue running the test even if warm up "
+                        "times out", action="store_true")
     parser.add_argument("--no-cool-down",
                         help="Do not wait for datapath flows to be cleared",
                         action="store_true")
@@ -3391,12 +3415,11 @@ def main():
                         help="Source Base MAC address",
                         type=str, default=DEFAULT_SRC_MAC_ADDRESS)
     parser.add_argument("--mac-swap",
-                         help="Swap source/destination mac at VM",
-                         action="store_true")
+                        help="Swap source/destination mac at VM",
+                        action="store_true")
     parser.add_argument("--zero-loss-step", metavar="PERCENTAGE",
                         help="Zero loss interval steps, default 1%%",
-                         type=float, default=1)
-
+                        type=float, default=1)
 
     config = parser.parse_args()
 
@@ -3586,6 +3609,12 @@ def main():
         lprint("ERROR: Invalid traffic rate configured (0.001..100]!")
         sys.exit(-1)
 
+    if is_vm_needed_for_tests() and config.testpmd_startup_delay == 0 and \
+       config.dut_vm_nic_queues < 2:
+        lprint("ERROR: When using less than 2 VM NIC queues the "
+               "--testpmd-startup-delay can not be AUTO(0)!")
+        sys.exit(-1)
+
     #
     # Dump settings if global debug is enabled
     #
@@ -3642,6 +3671,8 @@ def main():
     slogger.debug("  %-23.23s: %s", 'No cool down', config.no_cool_down)
     slogger.debug("  %-23.23s: %f", 'Zero loss step', config.zero_loss_step)
     slogger.debug("  %-23.23s: %f%%", 'Traffic rate', config.traffic_rate)
+    slogger.debug("  %-23.23s: %u seconds", 'testpmd startup delay',
+                  config.testpmd_startup_delay)
 
     #
     # If we use the GUI, we need to set the correct back-end
