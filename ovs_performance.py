@@ -3753,7 +3753,7 @@ def main():
                         default=DEFAULT_STREAM_LIST)
     parser.add_argument("--testpmd-startup-delay", metavar="SECONDS",
                         help="Time to wait before testpmd is ready to forward,"
-                        " 0 = auto (waits for CPU > 150%), default 0",
+                        " 0 = auto (waits for CPU > 150%%), default 0",
                         type=int, default=0)
     parser.add_argument("--traffic-rate", metavar="PERCENTAGE",
                         help="Traffic rate sent by tester, default 100%%",
