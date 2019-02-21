@@ -246,7 +246,7 @@ def calc_loss_percentage(results):
 
 
 #
-# Get the NFV results for a single binary search iteration
+# Get the PVP results for a single binary search iteration
 #
 def PVP_binary_search_single_run(test_value, **kwargs):
     packet_size = kwargs.get("packet_size", 64)
@@ -810,16 +810,19 @@ def test_p2p(nr_of_flows, packet_sizes):
         tester.clear_statistics(config.second_tester_interface)
 
         pp_tx_start, pp_tx_drop_start, pp_rx_start, pp_rx_drop_start \
-            = get_of_port_packet_stats(of_interfaces[config.physical_interface])
+            = get_of_port_packet_stats(
+                of_interfaces[config.physical_interface])
         rpp_tx_start, rpp_tx_drop_start, rpp_rx_start, rpp_rx_drop_start \
-            = get_of_port_packet_stats(of_interfaces[config.second_physical_interface])
+            = get_of_port_packet_stats(
+                of_interfaces[config.second_physical_interface])
 
         ##################################################
         lprint("  * Start CPU monitoring on DUT...")
         start_cpu_monitoring()
 
         ##################################################
-        lprint("  * Start packet generation for {0} seconds...".format(config.run_time))
+        lprint("  * Start packet generation for {0} seconds...".
+               format(config.run_time))
         tester.start_traffic(config.tester_interface)
         for i in range(1, config.run_time):
             time.sleep(1)
@@ -840,15 +843,19 @@ def test_p2p(nr_of_flows, packet_sizes):
         tester.take_tx_statistics_snapshot(config.tester_interface)
         tester.take_rx_statistics_snapshot(config.second_tester_interface)
 
-        full_tx_stats = tester.get_tx_statistics_snapshots(config.tester_interface)
-        full_rx_stats = tester.get_rx_statistics_snapshots(config.second_tester_interface)
+        full_tx_stats = tester.get_tx_statistics_snapshots(
+            config.tester_interface)
+        full_rx_stats = tester.get_rx_statistics_snapshots(
+            config.second_tester_interface)
         slogger.debug(" full_tx_stats={}".format(full_tx_stats))
         slogger.debug(" full_rx_stats={}".format(full_rx_stats))
 
         pp_tx_end, pp_tx_drop_end, pp_rx_end, pp_rx_drop_end \
-            = get_of_port_packet_stats(of_interfaces[config.physical_interface])
+            = get_of_port_packet_stats(
+                of_interfaces[config.physical_interface])
         rpp_tx_end, rpp_tx_drop_end, rpp_rx_end, rpp_rx_drop_end \
-            = get_of_port_packet_stats(of_interfaces[config.second_physical_interface])
+            = get_of_port_packet_stats(
+                of_interfaces[config.second_physical_interface])
 
         pp_rx = pp_rx_end - pp_rx_start
         pp_rx_drop = pp_rx_drop_end - pp_rx_drop_start
@@ -899,6 +906,378 @@ def test_p2p(nr_of_flows, packet_sizes):
                         phy_speed, cpu_utilization=cpu_results)
 
     return p2p_results, cpu_results
+
+
+#
+# Run simple traffic test Physical loopback
+#
+def test_p_single_packet_size(nr_of_flows, packet_size, **kwargs):
+
+    decrease_rate = kwargs.get("decrease_rate", 0)
+
+    assert (decrease_rate >= 0 or decrease_rate < 100)
+    decrease_rate *= 10000
+
+    results = dict()
+
+    ##################################################
+    lprint("- [TEST: {0}(flows={1}, packet_size={2}, rate={3:.2f}%)] START".
+           format(inspect.currentframe().f_code.co_name,
+                  nr_of_flows, packet_size, (1000000 - decrease_rate) / 10000))
+
+    ##################################################
+    lprint("  * Create OVS OpenFlow rules...")
+
+    create_ovs_of_rules(nr_of_flows,
+                        of_interfaces[config.physical_interface],
+                        "IN_PORT")
+
+    ##################################################
+    lprint("  * Initializing packet generation...")
+    tester.configure_traffic_stream(config.tester_interface,
+                                    get_traffic_generator_flow(),
+                                    nr_of_flows, packet_size,
+                                    traffic_dst_mac=config.dst_mac_address,
+                                    traffic_src_mac=config.src_mac_address,
+                                    percentage=1000000 - decrease_rate)
+
+    ##################################################
+    if config.warm_up:
+        lprint("  * Doing flow table warm-up...")
+
+        tester.start_traffic(config.tester_interface)
+
+        warm_up_done = warm_up_verify(nr_of_flows,
+                                      config.warm_up_timeout)
+
+        tester.stop_traffic(config.tester_interface)
+
+        if not warm_up_done and not config.warm_up_no_fail:
+                sys.exit(-1)
+
+    ##################################################
+    lprint("  * Clear all statistics...")
+    tester.clear_statistics(config.tester_interface)
+
+    pp_tx_start, pp_tx_drop_start, pp_rx_start, pp_rx_drop_start \
+        = get_of_port_packet_stats(of_interfaces[config.physical_interface])
+
+    ##################################################
+    lprint("  * Start CPU monitoring on DUT...")
+    start_cpu_monitoring()
+
+    ##################################################
+    lprint("  * Start packet generation for {0} seconds...".format(config.run_time))
+    tester.start_traffic(config.tester_interface)
+    for i in range(1, config.run_time):
+        time.sleep(1)
+        tester.take_rx_statistics_snapshot(config.tester_interface)
+
+    ##################################################
+    lprint("  * Stop CPU monitoring on DUT...")
+    stop_cpu_monitoring()
+
+    ##################################################
+    lprint("  * Stopping packet stream...")
+    tester.stop_traffic(config.tester_interface)
+    time.sleep(1)
+
+    ##################################################
+    lprint("  * Gathering statistics...")
+
+    tester.take_statistics_snapshot(config.tester_interface)
+
+    full_tx_stats = tester.get_tx_statistics_snapshots(config.tester_interface)
+    full_rx_stats = tester.get_rx_statistics_snapshots(config.tester_interface)
+    slogger.debug(" full_tx_stats={}".format(full_tx_stats))
+    slogger.debug(" full_rx_stats={}".format(full_rx_stats))
+
+    pp_tx_end, pp_tx_drop_end, pp_rx_end, pp_rx_drop_end \
+        = get_of_port_packet_stats(of_interfaces[config.physical_interface])
+
+    pp_rx = pp_rx_end - pp_rx_start
+    pp_tx = pp_tx_end - pp_tx_start
+    pp_rx_drop = pp_rx_drop_end - pp_rx_drop_start
+    pp_tx_drop = pp_tx_drop_end - pp_tx_drop_start
+
+    packets_tx = full_tx_stats[sorted(full_tx_stats.keys())[-1]]['pt_total']['packets']
+    packets_rx = full_rx_stats[sorted(full_rx_stats.keys())[-1]]['pr_total']['packets']
+
+    lprint("    - Packets send by Tester      : {:-20,}".format(packets_tx))
+
+    lprint("    - Packets received by physical: {:-20,} [Lost {:,}, Drop {:,}]".
+           format(pp_rx, packets_tx - pp_rx, pp_rx_drop))
+
+    lprint("    - Packets send by physical    : {:-20,} [Lost {:,}, Drop {:,}]".
+           format(pp_tx, pp_rx - pp_tx, pp_tx_drop))
+
+    lprint("    - Packets received by Tester  : {:-20,} [Lost {:,}]".
+           format(packets_rx, pp_tx - packets_rx))
+
+    rx_pkts_sec = get_packets_per_second_from_traffic_generator_rx_stats(full_rx_stats)
+    lprint("  ! Result, average: {:,} pps".format(rx_pkts_sec))
+
+    ##################################################
+    lprint("  * Restoring state for next test...")
+    tester.unconfigure_traffic_stream(config.tester_interface)
+
+    # dut_shell.dut_exec('sh -c "ovs-ofctl del-flows {0} && ovs-appctl dpctl/del-flows"'.\
+    #                    format(config.bridge_name),
+    #                    die_on_error=True)
+
+    ##################################################
+    lprint("- [TEST: {0}(flows={1}, packet_size={2})] END".
+           format(inspect.currentframe().f_code.co_name,
+                  nr_of_flows, packet_size))
+
+    results["cpu_stats"] = get_cpu_monitoring_stats()
+    results["rx_packets_second"] = rx_pkts_sec
+    results["total_tx_pkts"] = packets_tx
+    results["total_rx_pkts"] = packets_rx
+    return results
+
+
+#
+# Run simple traffic test Physical to VM back to Physical
+#
+def test_p(nr_of_flows, packet_sizes):
+
+    p_results = list()
+    cpu_results = list()
+
+    for packet_size in packet_sizes:
+        results = test_p_single_packet_size(nr_of_flows, packet_size,
+                                            decrease_rate=100 -
+                                            config.traffic_rate)
+
+        cpu_results.append(results["cpu_stats"])
+        p_results.append(results["rx_packets_second"])
+
+    create_single_graph(packet_sizes, p_results,
+                        "Packet size", "Packets/second",
+                        "Physical loopback with {} {} "
+                        "flows{}".format(nr_of_flows,  get_flow_type_short(),
+                                         get_traffic_rate_str()),
+                        "test_p_{}_{}".format(nr_of_flows,
+                                              get_flow_type_name()),
+                        phy_speed,
+                        cpu_utilization=cpu_results)
+
+    return p_results, cpu_results
+
+#
+# Run simple traffic test Physical to VM back to Physical
+#
+def test_p2v2p_zero_loss(stream_size_list, packet_size_list, **kwargs):
+
+    csv_handle = kwargs.pop("csv_handle", None)
+    zero_loss_step = kwargs.pop("zero_loss_step", 1)
+    flow_str = get_flow_type_short()
+    flow_file_str = get_flow_type_name()
+    test_results = dict()
+
+    for nr_of_streams in stream_size_list:
+        test_results[nr_of_streams] = dict()
+        for packet_size in packet_size_list:
+            results, index = binary_search(
+                1, 100, 0.00001,
+                PVP_binary_search_single_run,
+                PVP_binary_search_itteration_result,
+                bs_step=zero_loss_step,
+                packet_size=packet_size,
+                nr_of_streams=nr_of_streams)
+
+            for dump_index in natsorted(list(results.keys())):
+                result = results[dump_index]
+
+                lprint(
+                    "  > Results: load {:.6f}%, rate {} pps, miss {:.6f}%".
+                    format(result["traffic_rate"],
+                           result["rx_packets_second"],
+                           calc_loss_percentage(result)))
+
+            if index >= 1:
+                test_results[nr_of_streams][packet_size] = \
+                    results[index]
+                lprint("  ! Zero pkt loss @ pkt {}, load {:.6f}%,  "
+                       "miss {:.6f}%, rx rate {:,.0f} pps".
+                       format(packet_size, index,
+                              calc_loss_percentage(
+                                  results[index]),
+                              test_results[nr_of_streams][packet_size]
+                              ["rx_packets_second"]))
+            else:
+                test_results[nr_of_streams][packet_size] = results[min(results)]
+                lprint("  ! Zero pkt loss for {} bytes, NOT reached!!".
+                       format(packet_size))
+
+        pvp0_results, pvp0_cpu_results, pvp0_traffic_rate, pvp0_loss_rate \
+            = get_result_sets_from_zero_loss_results(test_results)
+
+        #
+        # Write the per flow size graphs
+        #
+        create_single_graph(
+            packet_size_list, pvp0_results[nr_of_streams],
+            "Packet size", "Packets/second",
+            "Physical to Virtual back to Physical Zero Loss "
+            "with {} {} flows".format(nr_of_streams,  flow_str),
+            "test_p2v2p_zero_{}_{}".format(nr_of_streams, flow_file_str),
+            phy_speed,
+            cpu_utilization=pvp0_cpu_results[nr_of_streams],
+            zero_loss_traffic_rate=pvp0_traffic_rate[nr_of_streams],
+            zero_loss_loss_rate=pvp0_loss_rate[nr_of_streams]
+        )
+
+        #
+        # This might look like a wrong indentation, but we would like to update
+        # the graph every stream run so we have a graph in case of a failure.
+        #
+        create_multiple_graph(packet_size_list, pvp0_results,
+                              "Packet size", "Packets/second",
+                              "Physical to Virtual to Physical Zero Loss, {}".
+                              format(flow_str),
+                              "test_p2v2p_zero_all_{}".
+                              format(flow_file_str),
+                              None, cpu_utilization=pvp0_cpu_results)
+
+        create_multiple_graph(packet_size_list, pvp0_results,
+                              "Packet size", "Packets/second",
+                              "Physical to Virtual to Physical Zero Loss, {}".
+                              format(flow_str),
+                              "test_p2v2p_zero_all_{}_ref".
+                              format(flow_file_str),
+                              [phy_speed],
+                              cpu_utilization=pvp0_cpu_results)
+
+    if csv_handle is not None:
+        csv_write_test_results(
+            csv_handle,
+            'Zero Loss Physical to Virtual to Physical test',
+            stream_size_list, packet_size_list,
+            pvp0_results, pvp0_cpu_results, loss_rate=pvp0_loss_rate,
+            traffic_rate=pvp0_traffic_rate)
+
+
+#
+# Get the P results for a single binary search iteration
+#
+def P_binary_search_single_run(test_value, **kwargs):
+    packet_size = kwargs.get("packet_size", 64)
+    nr_of_streams = kwargs.get("nr_of_streams", 10)
+
+    results = test_p_single_packet_size(nr_of_streams, packet_size,
+                                        decrease_rate=100 - test_value)
+
+    results["traffic_rate"] = test_value
+
+    lprint("  > Zero pkt loss: pkt {}, load {:.6f}%,  miss {:.6f}%".
+           format(packet_size, test_value,
+                  calc_loss_percentage(results)))
+
+    return results
+
+
+#
+# Run the P mobile tests for a binary search iteration
+#
+def P_binary_search_itteration_result(result_values, test_value, **kwargs):
+    return calc_loss_percentage(result_values[test_value])
+
+
+#
+# Run simple traffic test Physical loopback zero loss
+#
+def test_p_zero_loss(stream_size_list, packet_size_list, **kwargs):
+
+    csv_handle = kwargs.pop("csv_handle", None)
+    zero_loss_step = kwargs.pop("zero_loss_step", 1)
+    flow_str = get_flow_type_short()
+    flow_file_str = get_flow_type_name()
+    test_results = dict()
+
+    for nr_of_streams in stream_size_list:
+        test_results[nr_of_streams] = dict()
+        for packet_size in packet_size_list:
+            results, index = binary_search(
+                1, 100, 0.00001,
+                P_binary_search_single_run,
+                P_binary_search_itteration_result,
+                bs_step=zero_loss_step,
+                packet_size=packet_size,
+                nr_of_streams=nr_of_streams)
+
+            for dump_index in natsorted(list(results.keys())):
+                result = results[dump_index]
+
+                lprint(
+                    "  > Results: load {:.6f}%, rate {} pps, miss {:.6f}%".
+                    format(result["traffic_rate"],
+                           result["rx_packets_second"],
+                           calc_loss_percentage(result)))
+
+            if index >= 1:
+                test_results[nr_of_streams][packet_size] = \
+                    results[index]
+                lprint("  ! Zero pkt loss @ pkt {}, load {:.6f}%,  "
+                       "miss {:.6f}%, rx rate {:,.0f} pps".
+                       format(packet_size, index,
+                              calc_loss_percentage(
+                                  results[index]),
+                              test_results[nr_of_streams][packet_size]
+                              ["rx_packets_second"]))
+            else:
+                test_results[nr_of_streams][packet_size] = \
+                    results[min(results)]
+                lprint("  ! Zero pkt loss for {} bytes, NOT reached!!".
+                       format(packet_size))
+
+        p0_results, p0_cpu_results, p0_traffic_rate, p0_loss_rate \
+            = get_result_sets_from_zero_loss_results(test_results)
+
+        #
+        # Write the per flow size graphs
+        #
+        create_single_graph(
+            packet_size_list, p0_results[nr_of_streams],
+            "Packet size", "Packets/second",
+            "Physical Loopback Zero Loss "
+            "with {} {} flows".format(nr_of_streams,  flow_str),
+            "test_p_zero_{}_{}".format(nr_of_streams, flow_file_str),
+            phy_speed,
+            cpu_utilization=p0_cpu_results[nr_of_streams],
+            zero_loss_traffic_rate=p0_traffic_rate[nr_of_streams],
+            zero_loss_loss_rate=p0_loss_rate[nr_of_streams]
+        )
+
+        #
+        # This might look like a wrong indentation, but we would like to update
+        # the graph every stream run so we have a graph in case of a failure.
+        #
+        create_multiple_graph(packet_size_list, p0_results,
+                              "Packet size", "Packets/second",
+                              "Physical Loopback Zero Loss, {}".
+                              format(flow_str),
+                              "test_p_zero_all_{}".
+                              format(flow_file_str),
+                              None, cpu_utilization=p0_cpu_results)
+
+        create_multiple_graph(packet_size_list, p0_results,
+                              "Packet size", "Packets/second",
+                              "Physical Loopback Zero Loss, {}".
+                              format(flow_str),
+                              "test_p_zero_all_{}_ref".
+                              format(flow_file_str),
+                              [phy_speed],
+                              cpu_utilization=p0_cpu_results)
+
+    if csv_handle is not None:
+        csv_write_test_results(
+            csv_handle,
+            'Zero Loss Physical Loopback test',
+            stream_size_list, packet_size_list,
+            p0_results, p0_cpu_results, loss_rate=p0_loss_rate,
+            traffic_rate=p0_traffic_rate)
 
 
 #
@@ -3349,6 +3728,11 @@ def main():
                         default=DEFAULT_RUN_TIME)
     parser.add_argument("--run-pp-test",
                         help="Run the P to P test", action="store_true")
+    parser.add_argument("--run-p-test",
+                        help="Run the port loopback test", action="store_true")
+    parser.add_argument("--run-p-zero-loss-test",
+                        help="Run the P loopack test with zero packet loss",
+                        action="store_true")
     parser.add_argument("--run-pvp-zero-loss-test",
                         help="Run the P to V to P test with zero packet loss",
                         action="store_true")
@@ -3570,7 +3954,8 @@ def main():
         #
         if not config.skip_vv_test or not config.skip_pv_test \
            or not config.skip_pvp_test or config.run_pp_test or \
-           config.run_pvp_zero_loss_test:
+           config.run_pvp_zero_loss_test or config.run_p_test or \
+           config.run_p_zero_loss_test:
             lprint("ERROR: Tunnel tests can only be run individually "
                    "with the no-bridge-config option!")
             sys.exit(-1)
@@ -3665,8 +4050,11 @@ def main():
     slogger.debug("  %-23.23s: %s", 'Skip PVP test', config.skip_pvp_test)
     slogger.debug("  %-23.23s: %s", 'Skip VV test', config.skip_vv_test)
     slogger.debug("  %-23.23s: %s", 'Run PP test', config.run_pp_test)
+    slogger.debug("  %-23.23s: %s", 'Run P loopback test', config.run_p_test)
     slogger.debug("  %-23.23s: %s", 'Run PVP 0 loss test',
                   config.run_pvp_zero_loss_test)
+    slogger.debug("  %-23.23s: %s", 'Run P 0 loss test',
+                  config.run_p_zero_loss_test)
     slogger.debug("  %-23.23s: %s", 'Warm-up', config.warm_up)
     slogger.debug("  %-23.23s: %s", 'No cool down', config.no_cool_down)
     slogger.debug("  %-23.23s: %f", 'Zero loss step', config.zero_loss_step)
@@ -3764,7 +4152,8 @@ def main():
     if not config.no_bridge_config:
         if not config.skip_pv_test or not config.skip_pvp_test or \
            not config.skip_vv_test or config.run_pp_test or \
-           config.run_pvp_zero_loss_test:
+           config.run_pvp_zero_loss_test or config.run_p_test or \
+           config.run_p_zero_loss_test:
             #
             # Also skip if all we are running are the tunnel tests
             #
@@ -3775,7 +4164,8 @@ def main():
     #
     if not config.skip_pv_test or not config.skip_pvp_test or \
        not config.skip_vv_test or config.run_pp_test or \
-       config.run_pvp_zero_loss_test:
+       config.run_pvp_zero_loss_test or config.run_p_test or \
+       config.run_p_zero_loss_test:
 
         of_interfaces = dict()
         dp_interfaces = dict()
@@ -3841,6 +4231,8 @@ def main():
         p2p_cpu_results = dict()
         p2v2p_results = dict()
         p2v2p_cpu_results = dict()
+        p_results = dict()
+        p_cpu_results = dict()
 
         if not config.skip_vv_test:
             for nr_of_streams in stream_size_list:
@@ -3938,6 +4330,29 @@ def main():
                                    stream_size_list, packet_size_list,
                                    p2p_results, p2p_cpu_results)
 
+        if config.run_p_test:
+            for nr_of_streams in stream_size_list:
+                p_results[nr_of_streams], \
+                    p_cpu_results[nr_of_streams] = test_p(nr_of_streams, packet_size_list)
+
+                create_multiple_graph(packet_size_list, p_results,
+                                      "Packet size", "Packets/second",
+                                      "Physical to Virtual, {}{}".
+                                      format(flow_str, get_traffic_rate_str()),
+                                      "test_p_all_{}".format(flow_file_str),
+                                      None, cpu_utilization=p_cpu_results)
+
+                create_multiple_graph(packet_size_list, p_results,
+                                      "Packet size", "Packets/second",
+                                      "Physical to Virtual, {}{}".
+                                      format(flow_str, get_traffic_rate_str()),
+                                      "test_p_all_{}_ref".format(flow_file_str),
+                                      [phy_speed], cpu_utilization=p_cpu_results)
+
+            csv_write_test_results(csv_handle, 'Physical loopback test',
+                                   stream_size_list, packet_size_list,
+                                   p_results, p_cpu_results)
+
         if config.run_vxlan_test:
             if not config.no_bridge_config:
                 create_ovs_vxlan_bridge()
@@ -3980,6 +4395,14 @@ def main():
             test_p2v2p_zero_loss(stream_size_list, packet_size_list,
                                  zero_loss_step=config.zero_loss_step,
                                  csv_handle=csv_handle)
+
+        #
+        # Run the zero packet loss test for physical loopback
+        #
+        if config.run_p_zero_loss_test:
+            test_p_zero_loss(stream_size_list, packet_size_list,
+                             zero_loss_step=config.zero_loss_step,
+                             csv_handle=csv_handle)
 
     #
     # Done...
