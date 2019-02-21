@@ -1466,8 +1466,12 @@ def warm_up_verify(requested_flows, timeout):
     while active_flows < requested_flows:
         run_time += 1
         if timeout != 0 and run_time >= timeout:
-            lprint("ERROR: Failed to complete warm-up in time ({} seconds)!".
-                   format(timeout))
+
+            if config.flow_rule_type == "flows":
+                lprint("ERROR: Failed to complete warm-up in time "
+                       "({} seconds)!".format(timeout))
+            else:
+                lprint("  * Failed to complete warm-up as expected!")
             return False
 
         time.sleep(1)
