@@ -976,9 +976,11 @@ usage: ovs_performance.py [-h] [--bridge-name BRIDGE] [-d] [--debug-dut-shell]
                           [--second-physical-interface DEVICE]
                           [--second-physical-interface-pci PCI]
                           [--physical-speed GBPS] [--packet-list LIST]
-                          [-r SECONDS] [--run-pp-test]
-                          [--run-pvp-zero-loss-test] [--skip-pv-test]
-                          [--skip-pvp-test] [--stream-list LIST]
+                          [-r SECONDS] [--run-pp-test] [--run-p-test]
+                          [--run-p-zero-loss-test] [--run-pvp-zero-loss-test]
+                          [--skip-pv-test] [--skip-pvp-test]
+                          [--stream-list LIST]
+                          [--testpmd-startup-delay SECONDS]
                           [--traffic-rate PERCENTAGE] [--warm-up]
                           [--warm-up-timeout SECONDS] [--warm-up-no-fail]
                           [--no-cool-down] [-v DEVICE] [-x ADDRESS]
@@ -1037,11 +1039,17 @@ optional arguments:
   -r SECONDS, --run-time SECONDS
                         Traffic run time per test
   --run-pp-test         Run the P to P test
+  --run-p-test          Run the port loopback test
+  --run-p-zero-loss-test
+                        Run the P loopack test with zero packet loss
   --run-pvp-zero-loss-test
                         Run the P to V to P test with zero packet loss
   --skip-pv-test        Do not run the P to V test
   --skip-pvp-test       Do not run the P to V to P test
   --stream-list LIST    List of stream sizes to test
+  --testpmd-startup-delay SECONDS
+                        Time to wait before testpmd is ready to forward, 0 =
+                        auto (waits for CPU > 150%), default 0
   --traffic-rate PERCENTAGE
                         Traffic rate sent by tester, default 100%
   --warm-up             Do flow warm-up round before tests
