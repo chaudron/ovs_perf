@@ -3358,7 +3358,8 @@ def stop_cpu_monitoring(**kwargs):
 def get_cpu_monitoring_stats():
 
     cmd = r"cat /var/tmp/cpu_ovs.txt"
-    results = dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd], die_on_error=True)
+    results = dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd],
+                                 die_on_error=True)
 
     ovs_cpu_pmd = float(0)
     ovs_cpu_revalidator = float(0)
@@ -3366,8 +3367,12 @@ def get_cpu_monitoring_stats():
     ovs_cpu_urcu = float(0)
     ovs_cpu_other = float(0)
 
-    #                    Average:   0        -   6982     0.00       0.05       0.00        0.05     -  |__ovs-vswitchd
-    regex = re.compile("^Average:\s+[0-9]+\s+-\s+[0-9]+\s+[0-9\.]+\s+[0-9\.]+\s+[0-9\.]+\s+([0-9\.]+).+__(.+)", re.MULTILINE)
+    if "%guest   %wait    %CPU" in results.stdout_output:
+        #                    Average:   988      -   16979    0.00       0.00       0.00       0.00        0.00   -  |__ovs-vswitchd
+        regex = re.compile("^Average:\s+[0-9]+\s+-\s+[0-9]+\s+[0-9\.]+\s+[0-9\.]+\s+[0-9\.]+\s+[0-9\.]+\s+([0-9\.]+).+__(.+)", re.MULTILINE)
+    else:
+        #                    Average:   0        -   6982     0.00       0.05       0.00        0.05   -  |__ovs-vswitchd
+        regex = re.compile("^Average:\s+[0-9]+\s+-\s+[0-9]+\s+[0-9\.]+\s+[0-9\.]+\s+[0-9\.]+\s+([0-9\.]+).+__(.+)", re.MULTILINE)
 
     for match in regex.finditer(results.stdout_output):
         if match.group(2).startswith("pmd"):
@@ -3382,7 +3387,8 @@ def get_cpu_monitoring_stats():
             ovs_cpu_other += float(match.group(1))
 
     cmd = r"cat /var/tmp/cpu_mpstat.txt"
-    results = dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd], die_on_error=True)
+    results = dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd],
+                                 die_on_error=True)
 
     cpu_usr = float(0)
     cpu_nice = float(0)
