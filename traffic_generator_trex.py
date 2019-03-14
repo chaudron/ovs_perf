@@ -48,12 +48,12 @@ from traffic_generator_base import TrafficGeneratorChassis, \
 # Import TRex static traffic library, in addition tell it where to find the
 # dependent external libraries
 #
-os.environ['TREX_STL_EXT_PATH'] = os.path.normpath(os.path.join(
+os.environ['TREX_EXT_LIBS'] = os.path.normpath(os.path.join(
     os.path.dirname(os.path.realpath(__file__)),
-    "./trex_stl_lib/external_libs/"))
+    "./trex/external_libs/"))
 
-from trex_stl_lib.api import STLClient, STLError, STLPktBuilder, STLStream, \
-                      STLTXCont, STLVmFixIpv4, STLVmFlowVar, STLVmWrFlowVar
+from trex.stl.api import STLClient, STLError, STLPktBuilder, STLStream, \
+    STLTXCont, STLVmFixIpv4, STLVmFlowVar, STLVmWrFlowVar
 
 
 #
