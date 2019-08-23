@@ -47,8 +47,10 @@ done
 
 if [[ ${DATAPATH} = "dpdk" ]]; then
   NIC_Q=2
+  TESTPMD_DELAY=0
 else
   NIC_Q=1
+  TESTPMD_DELAY=8
 fi
 
 echo -n "What is the IP address where the DUT (Open vSwitch) is running? "
@@ -127,6 +129,7 @@ cd ~/pvp_results_10_l2_$DATAPATH
   --dut-vm-nic-rxd=$VM_RXD \
   --dut-vm-nic-txd=$VM_TXD \
   --stream-list=$STREAM_LIST \
+  --testpmd-startup-delay=$TESTPMD_DELAY \
   --run-time=1000
 
 
@@ -154,6 +157,7 @@ cd ~/pvp_results_10_l3_$DATAPATH
   --dut-vm-nic-rxd=$VM_RXD \
   --dut-vm-nic-txd=$VM_TXD \
   --stream-list=$STREAM_LIST \
+  --testpmd-startup-delay=$TESTPMD_DELAY \
   --run-time=1000
 
 
@@ -180,6 +184,7 @@ cd ~/pvp_results_1_l2_$DATAPATH
   --dut-vm-nic-rxd=$VM_RXD \
   --dut-vm-nic-txd=$VM_TXD \
   --stream-list=$STREAM_LIST \
+  --testpmd-startup-delay=$TESTPMD_DELAY \
   --flow-type=L2
 
 
@@ -206,6 +211,7 @@ cd ~/pvp_results_1_l3_$DATAPATH
   --dut-vm-nic-rxd=$VM_RXD \
   --dut-vm-nic-txd=$VM_TXD \
   --stream-list=$STREAM_LIST \
+  --testpmd-startup-delay=$TESTPMD_DELAY \
   --flow-type=L3
 
 
