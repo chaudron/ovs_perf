@@ -1660,7 +1660,7 @@ def get_traffic_rx_stats_from_vm(vm, **kwargs):
     result = dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd], die_on_error=True)
 
     pkt_rates = [int(re.sub(r'^\s*Rx-pps:\s*', '', s))
-                 for s in re.findall(r'^\s*Rx-pps:\s*\d+$', result.stdout_output,
+                 for s in re.findall(r'^\s*Rx-pps:\s*\d+', result.stdout_output,
                                      re.MULTILINE)]
 
     if skip_samples > 0:
