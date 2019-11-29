@@ -1667,7 +1667,7 @@ def get_traffic_rx_stats_from_vm(vm, **kwargs):
         pkt_rates = pkt_rates[skip_samples:]
 
     if len(pkt_rates) <= 10:
-        lprint("ERROR: No engough elements to calculate packet rate!")
+        lprint("ERROR: Not enough elements to calculate packet rate!")
         sys.exit(-1)
 
     pkt_rates = pkt_rates[5:-5]
@@ -1795,7 +1795,7 @@ def get_packets_per_second_from_pkt_counters(counters, strip):
     counter_list = map(int, counters_clean.split())
 
     if strip < 0 or (len(counter_list) - (strip * 2)) < 2:
-        lprint("ERROR: No engough elements to calculate packet rate!")
+        lprint("ERROR: Not enough elements to calculate packet rate!")
         sys.exit(-1)
 
     if strip > 0:
