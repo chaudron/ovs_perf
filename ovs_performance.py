@@ -4347,14 +4347,14 @@ def main():
 
                 create_multiple_graph(packet_size_list, p_results,
                                       "Packet size", "Packets/second",
-                                      "Physical to Virtual, {}{}".
+                                      "Physical loopback, {}{}".
                                       format(flow_str, get_traffic_rate_str()),
                                       "test_p_all_{}".format(flow_file_str),
                                       None, cpu_utilization=p_cpu_results)
 
                 create_multiple_graph(packet_size_list, p_results,
                                       "Packet size", "Packets/second",
-                                      "Physical to Virtual, {}{}".
+                                      "Physical loopback, {}{}".
                                       format(flow_str, get_traffic_rate_str()),
                                       "test_p_all_{}_ref".format(flow_file_str),
                                       [phy_speed], cpu_utilization=p_cpu_results)
