@@ -98,10 +98,13 @@ Download and unpack the TRex traffic generator:
 ```
 mkdir trex
 cd trex
-wget http://trex-tgn.cisco.com/trex/release/v2.53.tar.gz
+wget --no-check-certifcate https://trex-tgn.cisco.com/trex/release/v2.53.tar.gz
 tar -xvzf v2.53.tar.gz
 cd v2.53
 ```
+
+Note that when using Python 3.7 a minimum version of v2.61 is required.
+v2.80 has been successfully run on Fedora 31 with Python 3.7.6.
 
 Figure out PCI address of the card we would like to use, using the _lshw_
 utility:
