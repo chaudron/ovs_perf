@@ -98,7 +98,7 @@ Download and unpack the TRex traffic generator:
 ```
 mkdir trex
 cd trex
-wget --no-check-certifcate https://trex-tgn.cisco.com/trex/release/v2.53.tar.gz
+wget --no-check-certificate https://trex-tgn.cisco.com/trex/release/v2.53.tar.gz
 tar -xvzf v2.53.tar.gz
 cd v2.53
 ```
