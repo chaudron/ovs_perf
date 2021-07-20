@@ -3462,6 +3462,25 @@ def get_ovs_version():
     lprint("ERROR: Can't figure out ovs-vswitchd's version!")
     sys.exit(-1)
 
+def create_testpmd_link_if_dpdk_new(vm):
+    cmd = r"sshpass -p {2} ssh -o UserKnownHostsFile=/dev/null " \
+          r"-o StrictHostKeyChecking=no -n {1}@{0} " \
+          r"command -v testpmd". \
+          format(vm, config.dut_vm_user, config.dut_vm_password)
+
+    result = dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd],
+                                die_on_error=False)
+
+    m = re.search('testpmd',result.output)
+    if m:
+        lprint("dpdk-tool has command testpmd")
+    else:
+        cmd = r"sshpass -p {2} ssh -o UserKnownHostsFile=/dev/null " \
+              r"-o StrictHostKeyChecking=no -n {1}@{0} " \
+              r"ln -s /usr/bin/dpdk-testpmd /usr/bin/testpmd". \
+              format(vm, config.dut_vm_user, config.dut_vm_password)
+        result = dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd],
+                                    die_on_error=False)
 
 #
 # Get VM DPDK version
@@ -4102,6 +4121,7 @@ def main():
     #                     "test_p2v_1000")
     # sys.exit(-1)
 
+
     #
     # Connecting to Tester
     #
@@ -4140,6 +4160,10 @@ def main():
 
     if config.debug_dut_shell:
         dut_shell.logger.setLevel(logging.DEBUG)
+
+    # If new version dpdk-tool changes the command "testpmd" to "dpdk-testpmd"
+    # create soft link.
+    create_testpmd_link_if_dpdk_new(config.dut_vm_address)
 
     ovs_version = get_ovs_version()
 
