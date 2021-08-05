@@ -3472,9 +3472,7 @@ def create_testpmd_link_if_dpdk_new(vm):
                                 die_on_error=False)
 
     m = re.search('testpmd',result.output)
-    if m:
-        lprint("dpdk-tool has command testpmd")
-    else:
+    if not m:
         cmd = r"sshpass -p {2} ssh -o UserKnownHostsFile=/dev/null " \
               r"-o StrictHostKeyChecking=no -n {1}@{0} " \
               r"ln -s /usr/bin/dpdk-testpmd /usr/bin/testpmd". \
@@ -4121,7 +4119,6 @@ def main():
     #                     "test_p2v_1000")
     # sys.exit(-1)
 
-
     #
     # Connecting to Tester
     #
@@ -4161,8 +4158,7 @@ def main():
     if config.debug_dut_shell:
         dut_shell.logger.setLevel(logging.DEBUG)
 
-    # If new version dpdk-tool changes the command "testpmd" to "dpdk-testpmd"
-    # create soft link.
+    lprint("- Create testpmd link on VM for dpdk-testpmd, if needed...")
     create_testpmd_link_if_dpdk_new(config.dut_vm_address)
 
     ovs_version = get_ovs_version()
