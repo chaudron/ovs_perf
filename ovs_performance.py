@@ -83,12 +83,6 @@ from traffic_generator_base import TrafficFlowType
 from traffic_generator import TrafficGenerator, TrafficGeneratorType
 
 #
-# Imports from Matplot, by default disable the tk interface
-#
-import matplotlib
-matplotlib.use('Agg')
-
-#
 # Imports from natural sort
 #
 from natsort import natsorted
@@ -97,6 +91,12 @@ from natsort import natsorted
 # Imports from distutils
 #
 from distutils.version import StrictVersion
+
+#
+# Imports from Matplot, by default disable the tk interface
+#
+import matplotlib
+matplotlib.use('Agg')
 
 # In Python 2, raw_input() returns a string, and input() tries
 # to run the input as a Python expression.
@@ -287,7 +287,7 @@ def binary_search(min_value, max_value, required_result,
     #
     # Need values from max to min, but in low to high order
     #
-    values = np.arange(max_value, min_value-min(min_value, step), -step)
+    values = np.arange(max_value, min_value - min(min_value, step), -step)
     values = values[::-1]
 
     if len(values) <= 1:
@@ -382,7 +382,7 @@ def test_p2v2p_single_packet_size(nr_of_flows, packet_size, **kwargs):
         tester.stop_traffic(config.tester_interface)
 
         if not warm_up_done and not config.warm_up_no_fail:
-                sys.exit(-1)
+            sys.exit(-1)
 
     ##################################################
     lprint("  * Clear all statistics...")
@@ -524,7 +524,7 @@ def test_p2v2p(nr_of_flows, packet_sizes):
     create_single_graph(packet_sizes, p2v2p_results,
                         "Packet size", "Packets/second",
                         "Physical to Virtual back to Physical with {} {} "
-                        "flows{}".format(nr_of_flows,  get_flow_type_short(),
+                        "flows{}".format(nr_of_flows, get_flow_type_short(),
                                          get_traffic_rate_str()),
                         "test_p2v2p_{}_{}".format(nr_of_flows,
                                                   get_flow_type_name()),
@@ -532,100 +532,6 @@ def test_p2v2p(nr_of_flows, packet_sizes):
                         cpu_utilization=cpu_results)
 
     return p2v2p_results, cpu_results
-
-
-#
-# Run simple traffic test Physical to VM back to Physical
-#
-def test_p2v2p_zero_loss(stream_size_list, packet_size_list, **kwargs):
-
-    csv_handle = kwargs.pop("csv_handle", None)
-    zero_loss_step = kwargs.pop("zero_loss_step", 1)
-    flow_str = get_flow_type_short()
-    flow_file_str = get_flow_type_name()
-    test_results = dict()
-
-    for nr_of_streams in stream_size_list:
-        test_results[nr_of_streams] = dict()
-        for packet_size in packet_size_list:
-            results, index = binary_search(
-                1, 100, 0.00001,
-                PVP_binary_search_single_run,
-                PVP_binary_search_itteration_result,
-                bs_step=zero_loss_step,
-                packet_size=packet_size,
-                nr_of_streams=nr_of_streams)
-
-            for dump_index in natsorted(list(results.keys())):
-                result = results[dump_index]
-
-                lprint(
-                    "  > Results: load {:.6f}%, rate {} pps, miss {:.6f}%".
-                    format(result["traffic_rate"],
-                           result["rx_packets_second"],
-                           calc_loss_percentage(result)))
-
-            if index >= 1:
-                test_results[nr_of_streams][packet_size] = \
-                    results[index]
-                lprint("  ! Zero pkt loss @ pkt {}, load {:.6f}%,  "
-                       "miss {:.6f}%, rx rate {:,.0f} pps".
-                       format(packet_size, index,
-                              calc_loss_percentage(
-                                  results[index]),
-                              test_results[nr_of_streams][packet_size]
-                              ["rx_packets_second"]))
-            else:
-                test_results[nr_of_streams][packet_size] = results[min(results)]
-                lprint("  ! Zero pkt loss for {} bytes, NOT reached!!".
-                       format(packet_size))
-
-        pvp0_results, pvp0_cpu_results, pvp0_traffic_rate, pvp0_loss_rate \
-            = get_result_sets_from_zero_loss_results(test_results)
-
-        #
-        # Write the per flow size graphs
-        #
-        create_single_graph(
-            packet_size_list, pvp0_results[nr_of_streams],
-            "Packet size", "Packets/second",
-            "Physical to Virtual back to Physical Zero Loss "
-            "with {} {} flows".format(nr_of_streams,  flow_str),
-            "test_p2v2p_zero_{}_{}".format(nr_of_streams, flow_file_str),
-            phy_speed,
-            cpu_utilization=pvp0_cpu_results[nr_of_streams],
-            zero_loss_traffic_rate=pvp0_traffic_rate[nr_of_streams],
-            zero_loss_loss_rate=pvp0_loss_rate[nr_of_streams]
-        )
-
-        #
-        # This might look like a wrong indentation, but we would like to update
-        # the graph every stream run so we have a graph in case of a failure.
-        #
-        create_multiple_graph(packet_size_list, pvp0_results,
-                              "Packet size", "Packets/second",
-                              "Physical to Virtual to Physical Zero Loss, {}".
-                              format(flow_str),
-                              "test_p2v2p_zero_all_{}".
-                              format(flow_file_str),
-                              None, cpu_utilization=pvp0_cpu_results)
-
-        create_multiple_graph(packet_size_list, pvp0_results,
-                              "Packet size", "Packets/second",
-                              "Physical to Virtual to Physical Zero Loss, {}".
-                              format(flow_str),
-                              "test_p2v2p_zero_all_{}_ref".
-                              format(flow_file_str),
-                              [phy_speed],
-                              cpu_utilization=pvp0_cpu_results)
-
-    if csv_handle is not None:
-        csv_write_test_results(
-            csv_handle,
-            'Zero Loss Physical to Virtual to Physical test',
-            stream_size_list, packet_size_list,
-            pvp0_results, pvp0_cpu_results, loss_rate=pvp0_loss_rate,
-            traffic_rate=pvp0_traffic_rate)
 
 
 #
@@ -665,7 +571,7 @@ def test_p2v(nr_of_flows, packet_sizes):
             warm_up_done = warm_up_verify(nr_of_flows, config.warm_up_timeout)
             tester.stop_traffic(config.tester_interface)
             if not warm_up_done and not config.warm_up_no_fail:
-                    sys.exit(-1)
+                sys.exit(-1)
 
         ##################################################
         lprint("  * Clear all statistics...")
@@ -953,7 +859,7 @@ def test_p_single_packet_size(nr_of_flows, packet_size, **kwargs):
         tester.stop_traffic(config.tester_interface)
 
         if not warm_up_done and not config.warm_up_no_fail:
-                sys.exit(-1)
+            sys.exit(-1)
 
     ##################################################
     lprint("  * Clear all statistics...")
@@ -1056,7 +962,7 @@ def test_p(nr_of_flows, packet_sizes):
     create_single_graph(packet_sizes, p_results,
                         "Packet size", "Packets/second",
                         "Physical loopback with {} {} "
-                        "flows{}".format(nr_of_flows,  get_flow_type_short(),
+                        "flows{}".format(nr_of_flows, get_flow_type_short(),
                                          get_traffic_rate_str()),
                         "test_p_{}_{}".format(nr_of_flows,
                                               get_flow_type_name()),
@@ -1064,6 +970,7 @@ def test_p(nr_of_flows, packet_sizes):
                         cpu_utilization=cpu_results)
 
     return p_results, cpu_results
+
 
 #
 # Run simple traffic test Physical to VM back to Physical
@@ -1121,7 +1028,7 @@ def test_p2v2p_zero_loss(stream_size_list, packet_size_list, **kwargs):
             packet_size_list, pvp0_results[nr_of_streams],
             "Packet size", "Packets/second",
             "Physical to Virtual back to Physical Zero Loss "
-            "with {} {} flows".format(nr_of_streams,  flow_str),
+            "with {} {} flows".format(nr_of_streams, flow_str),
             "test_p2v2p_zero_{}_{}".format(nr_of_streams, flow_file_str),
             phy_speed,
             cpu_utilization=pvp0_cpu_results[nr_of_streams],
@@ -1242,7 +1149,7 @@ def test_p_zero_loss(stream_size_list, packet_size_list, **kwargs):
             packet_size_list, p0_results[nr_of_streams],
             "Packet size", "Packets/second",
             "Physical Loopback Zero Loss "
-            "with {} {} flows".format(nr_of_streams,  flow_str),
+            "with {} {} flows".format(nr_of_streams, flow_str),
             "test_p_zero_{}_{}".format(nr_of_streams, flow_file_str),
             phy_speed,
             cpu_utilization=p0_cpu_results[nr_of_streams],
@@ -1309,8 +1216,8 @@ def test_vxlan(nr_of_flows, packet_sizes, pvp_test=False):
     lprint("  * Create OVS OpenFlow rules...")
     if pvp_test is True:
         create_ovs_bidirectional_of_rules(nr_of_flows,
-                of_interfaces['vxlan0'],
-                of_interfaces[config.virtual_interface])
+                                          of_interfaces['vxlan0'],
+                                          of_interfaces[config.virtual_interface])
     else:
         create_ovs_of_rules(nr_of_flows,
                             of_interfaces['vxlan0'],
@@ -1351,10 +1258,10 @@ def test_vxlan(nr_of_flows, packet_sizes, pvp_test=False):
 
         if pvp_test is True:
             pp_tx_start, pp_tx_drop_start, pp_rx_start, pp_rx_drop_start \
-               = get_of_port_packet_stats(of_interfaces[config.physical_interface], bridge=tunnel_bridge)
+                = get_of_port_packet_stats(of_interfaces[config.physical_interface], bridge=tunnel_bridge)
 
             vp_tx_start, vp_tx_drop_start, vp_rx_start, vp_rx_drop_start \
-               = get_of_port_packet_stats(of_interfaces[config.virtual_interface])
+                = get_of_port_packet_stats(of_interfaces[config.virtual_interface])
         else:
             pp_rx_start \
                 = get_of_port_packet_stats(of_interfaces[config.physical_interface],
@@ -1411,7 +1318,6 @@ def test_vxlan(nr_of_flows, packet_sizes, pvp_test=False):
         if pvp_test is True:
             full_rx_stats = tester.get_rx_statistics_snapshots(config.tester_interface)
             slogger.debug(" full_rx_stats={}".format(full_rx_stats))
-
 
         pp_rx_end = get_of_port_packet_stats(of_interfaces[config.physical_interface],
                                              bridge=tunnel_bridge)[2]
@@ -1688,7 +1594,7 @@ def get_traffic_rx_stats_from_vm(vm, **kwargs):
     result = dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd], die_on_error=True)
 
     pkt_rates = [int(re.sub(r'^\s*Rx-pps:\s*', '', s))
-                 for s in re.findall(r'^\s*Rx-pps:\s*\d+', result.stdout_output,
+                 for s in re.findall(r'^\s*Rx-pps:\s*\\d+', result.stdout_output,
                                      re.MULTILINE)]
 
     if skip_samples > 0:
@@ -2318,19 +2224,17 @@ def create_ovs_bridge():
                            format(config.virtual_interface,
                                   config.pmd_rxq_affinity.count(':'),
                                   config.pmd_rxq_affinity)
-
-
     #
     # Add second virtual ports if vv test is enabled
     #
     if not config.skip_vv_test:
         command += "-- add-port {0} {1} -- set Interface {1} ofport_request=21 ". \
-                  format(config.bridge_name,
-                         config.second_virtual_interface)
+            format(config.bridge_name,
+                   config.second_virtual_interface)
 
         if dpdk:
             command += "-- set Interface {0} type=dpdkvhostuser ". \
-                        format(config.second_virtual_interface)
+                format(config.second_virtual_interface)
 
             if config.pmd_rxq_affinity is not None:
                 command += "-- set Interface {0} options:n_rxq={1} " \
@@ -2343,12 +2247,12 @@ def create_ovs_bridge():
     #
     if config.run_pp_test:
         command += "-- add-port {0} {1} -- set Interface {1} ofport_request=11 ". \
-                  format(config.bridge_name,
-                         config.second_physical_interface)
+            format(config.bridge_name,
+                   config.second_physical_interface)
 
         if dpdk:
             command += "-- set Interface {0} type=dpdk ". \
-                  format(config.second_physical_interface)
+                format(config.second_physical_interface)
 
             if config.pmd_rxq_affinity is not None:
                 command += "-- set Interface {0} options:n_rxq={1} " \
@@ -2527,7 +2431,7 @@ def get_bridge_port_numbers(tunnel=False):
         interfaces.append('vxlan0')
 
     for interface in interfaces:
-        m = re.search('\s*([0-9]*)\({0}\): addr:.*'.format(interface),
+        m = re.search('\\s*([0-9]*)\\({0}\\): addr:.*'.format(interface),
                       result.output)
         if m:
             of[interface] = m.group(1)
@@ -2539,7 +2443,7 @@ def get_bridge_port_numbers(tunnel=False):
         if interface == 'vxlan0':
             continue
 
-        m = re.search('\s*port\s*([0-9]*):\s*{0}\s*.*'.format(interface),
+        m = re.search('\\s*port\\s*([0-9]*):\\s*{0}\\s*.*'.format(interface),
                       result.output)
         if m:
             dp[interface] = m.group(1)
@@ -2562,7 +2466,7 @@ def get_of_port_packet_stats(of_port, **kwargs):
     bridge = kwargs.pop("bridge", config.bridge_name)
     port_stats = of_dump_port_to_logfile(bridge)
 
-    m = re.search('\s.*port *{}: rx pkts=.*\n.*tx pkts=([0-9?]*), '.format(of_port),
+    m = re.search('\\s.*port *{}: rx pkts=.*\n.*tx pkts=([0-9?]*), '.format(of_port),
                   port_stats.output)
     if m:
         if '?' in m.group(1):
@@ -2575,7 +2479,7 @@ def get_of_port_packet_stats(of_port, **kwargs):
                format(of_port, config.bridge_name))
         sys.exit(-1)
 
-    m = re.search('\s.*port *{}: rx pkts=.*\n.*tx pkts=.* drop=([0-9?]*), .*'.format(of_port),
+    m = re.search('\\s.*port *{}: rx pkts=.*\n.*tx pkts=.* drop=([0-9?]*), .*'.format(of_port),
                   port_stats.output)
     if m:
         if '?' in m.group(1):
@@ -2588,7 +2492,7 @@ def get_of_port_packet_stats(of_port, **kwargs):
                format(of_port, config.bridge_name))
         sys.exit(-1)
 
-    m = re.search('\s.*port *{}: rx pkts=([0-9?]*), .*'.format(of_port),
+    m = re.search('\\s.*port *{}: rx pkts=([0-9?]*), .*'.format(of_port),
                   port_stats.output)
     if m:
         if '?' in m.group(1):
@@ -2601,7 +2505,7 @@ def get_of_port_packet_stats(of_port, **kwargs):
                format(of_port, config.bridge_name))
         sys.exit(-1)
 
-    m = re.search('\s.*port *{}: rx pkts=.* drop=([0-9?]*), .*'.format(of_port),
+    m = re.search('\\s.*port *{}: rx pkts=.* drop=([0-9?]*), .*'.format(of_port),
                   port_stats.output)
     if m:
         if '?' in m.group(1):
@@ -3155,7 +3059,7 @@ def get_physical_port_speed():
 
     result = dut_shell.dut_exec("ethtool {}".format(config.physical_interface))
 
-    m = re.search('\s*Speed: ([0-9]*)Mb.*', result.output)
+    m = re.search('\\s*Speed: ([0-9]*)Mb.*', result.output)
     if m:
         speed = int(m.group(1)) * 1000000
     else:
@@ -3305,8 +3209,8 @@ def check_pci_address_string(pci_address):
     if pci_address is None:
         return False
 
-    if re.match("^\d{4}:\d{2}:[0-9A-Fa-f]{2}\.\d{1}$", pci_address) is None and \
-       re.match("^\d{4}:\d{2}:[0-9A-Fa-f]{2}\.\d{1},txq_inline=\d+$", pci_address) is None:
+    if re.match("^\\d{4}:\\d{2}:[0-9A-Fa-f]{2}\\.\\d{1}$", pci_address) is None and \
+       re.match("^\\d{4}:\\d{2}:[0-9A-Fa-f]{2}\\.\\d{1},txq_inline=\\d+$", pci_address) is None:
         return False
 
     return True
@@ -3318,7 +3222,7 @@ def check_pci_address_string(pci_address):
 # is enabled else we end up with the same text on the console twice.
 #
 def lprint(msg):
-    print (msg)
+    print(msg)
     if config.logging is not None:
         slogger.info(msg)
 
@@ -3397,10 +3301,10 @@ def get_cpu_monitoring_stats():
 
     if "%guest   %wait    %CPU" in results.stdout_output:
         #                    Average:   988      -   16979    0.00       0.00       0.00       0.00        0.00   -  |__ovs-vswitchd
-        regex = re.compile("^Average:\s+[0-9]+\s+-\s+[0-9]+\s+[0-9\.]+\s+[0-9\.]+\s+[0-9\.]+\s+[0-9\.]+\s+([0-9\.]+).+__(.+)", re.MULTILINE)
+        regex = re.compile("^Average:\\s+[0-9]+\\s+-\\s+[0-9]+\\s+[0-9\\.]+\\s+[0-9\\.]+\\s+[0-9\\.]+\\s+[0-9\\.]+\\s+([0-9\\.]+).+__(.+)", re.MULTILINE)
     else:
         #                    Average:   0        -   6982     0.00       0.05       0.00        0.05   -  |__ovs-vswitchd
-        regex = re.compile("^Average:\s+[0-9]+\s+-\s+[0-9]+\s+[0-9\.]+\s+[0-9\.]+\s+[0-9\.]+\s+([0-9\.]+).+__(.+)", re.MULTILINE)
+        regex = re.compile("^Average:\\s+[0-9]+\\s+-\\s+[0-9]+\\s+[0-9\\.]+\\s+[0-9\\.]+\\s+[0-9\\.]+\\s+([0-9\\.]+).+__(.+)", re.MULTILINE)
 
     for match in regex.finditer(results.stdout_output):
         if match.group(2).startswith("pmd"):
@@ -3429,7 +3333,7 @@ def get_cpu_monitoring_stats():
     cpu_gnice = float(0)
     cpu_idle = float(0)
     #  %usr   %nice    %sys %iowait    %irq   %soft  %steal  %guest  %gnice   %idle
-    regex = re.compile("^Average:\s+[0-9]+\s+([0-9\.]+)\s+([0-9\.]+)\s+([0-9\.]+)\s+([0-9\.]+)\s+([0-9\.]+)\s+([0-9\.]+)\s+([0-9\.]+)\s+([0-9\.]+)\s+([0-9\.]+)\s+([0-9\.]+)$",
+    regex = re.compile("^Average:\\s+[0-9]+\\s+([0-9\\.]+)\\s+([0-9\\.]+)\\s+([0-9\\.]+)\\s+([0-9\\.]+)\\s+([0-9\\.]+)\\s+([0-9\\.]+)\\s+([0-9\\.]+)\\s+([0-9\\.]+)\\s+([0-9\\.]+)\\s+([0-9\\.]+)$",
                        re.MULTILINE)
     for match in regex.finditer(results.stdout_output):
         cpu_usr += float(match.group(1))
@@ -3443,8 +3347,8 @@ def get_cpu_monitoring_stats():
         cpu_gnice += float(match.group(9))
         cpu_idle += float(match.group(10))
 
-    cpu_total = int(cpu_usr + cpu_nice + cpu_sys + cpu_iowait +
-                    cpu_irq + cpu_soft + cpu_steal + cpu_guest +
+    cpu_total = int(cpu_usr + cpu_nice + cpu_sys + cpu_iowait + \
+                    cpu_irq + cpu_soft + cpu_steal + cpu_guest + \
                     cpu_gnice + cpu_idle)
 
     ovs_cpu_total = ovs_cpu_pmd + ovs_cpu_revalidator + ovs_cpu_handler + \
@@ -3488,6 +3392,7 @@ def get_ovs_version():
     lprint("ERROR: Can't figure out ovs-vswitchd's version!")
     sys.exit(-1)
 
+
 def create_testpmd_link_if_dpdk_new(vm):
     cmd = r"sshpass -p {2} ssh -o UserKnownHostsFile=/dev/null " \
           r"-o StrictHostKeyChecking=no -n {1}@{0} " \
@@ -3497,7 +3402,7 @@ def create_testpmd_link_if_dpdk_new(vm):
     result = dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd],
                                 die_on_error=False)
 
-    m = re.search('testpmd',result.output)
+    m = re.search('testpmd', result.output)
     if not m:
         cmd = r"sshpass -p {2} ssh -o UserKnownHostsFile=/dev/null " \
               r"-o StrictHostKeyChecking=no -n {1}@{0} " \
@@ -3505,6 +3410,7 @@ def create_testpmd_link_if_dpdk_new(vm):
               format(vm, config.dut_vm_user, config.dut_vm_password)
         result = dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd],
                                     die_on_error=False)
+
 
 #
 # Get VM DPDK version
@@ -3519,7 +3425,7 @@ def get_vm_dpdk_version(vm):
     result = dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd],
                                 die_on_error=False)
 
-    m = re.search('DPDK ([0-9]+\.[0-9]+\.[0-9]+)',
+    m = re.search('DPDK ([0-9]+\\.[0-9]+\\.[0-9]+)',
                   result.output)
     if m:
         return str(m.group(1))
@@ -3568,7 +3474,7 @@ def get_of_bridge_mac_address(bridge):
     command = 'sh -c "ovs-ofctl show {0}"'.format(bridge)
     result = dut_shell.dut_exec(command, die_on_error=True)
 
-    m = re.search('\s*LOCAL\({0}\): addr:(.*)'.format(bridge),
+    m = re.search('\\s*LOCAL\\({0}\\): addr:(.*)'.format(bridge),
                   result.output)
     if not m:
         lprint("ERROR: Can't figure out MAC address for bridge \"{}\"".
@@ -4025,14 +3931,14 @@ def main():
 
     if config.warm_up and config.flow_rule_type != "flows" and \
        not config.warm_up_no_fail:
-            lprint("ERROR: --warm-up for none --flow-rule-type \"flows\" MUST "
-                   "be configured with --warm-up-no-fail!")
-            sys.exit(-1)
+        lprint("ERROR: --warm-up for none --flow-rule-type \"flows\" MUST "
+               "be configured with --warm-up-no-fail!")
+        sys.exit(-1)
 
     if config.flow_rule_type == 'NORMAL' and not config.mac_swap:
-            lprint("ERROR: The NORMAL flow rule type requires the --mac-swap "
-                   "option!")
-            sys.exit(-1)
+        lprint("ERROR: The NORMAL flow rule type requires the --mac-swap "
+               "option!")
+        sys.exit(-1)
 
     if config.zero_loss_step > 25 or config.zero_loss_step < 0.001:
         lprint("ERROR: Invalid zero loss interval step size supplied "
@@ -4126,7 +4032,6 @@ def main():
     # explained above as python loads the modules beforehand.
 
     import matplotlib.pyplot as plt
-    from matplotlib.ticker import ScalarFormatter, FormatStrFormatter
 
     #
     # Quick regenerate grapgh from results (DEBUG)
