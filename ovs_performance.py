@@ -3699,6 +3699,8 @@ def main():
                         action="store_true")
     parser.add_argument("--run-vxlan-test",
                         help="Run the VXLAN tunnel test", action="store_true")
+    parser.add_argument("--vxlan-test-is-pvp",
+                        help="Run the VXLAN tunnel test as a PVP test", action="store_true")
     parser.add_argument("--skip-pv-test",
                         help="Do not run the P to V test", action="store_true")
     parser.add_argument("--skip-pvp-test",
@@ -4325,7 +4327,8 @@ def main():
             for nr_of_streams in stream_size_list:
                 vxlan_results[nr_of_streams], \
                     vxlan_cpu_results[nr_of_streams] = test_vxlan(nr_of_streams,
-                                                                  packet_size_list)
+                                                                  packet_size_list,
+                                                                  config.vxlan_test_is_pvp)
 
                 create_multiple_graph(packet_size_list, vxlan_results,
                                       "Packet size", "Packets/second",
