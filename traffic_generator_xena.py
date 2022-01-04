@@ -43,8 +43,8 @@ import binascii
 # External traffic generators
 #
 from traffic_generator_base import TrafficGeneratorChassis, \
-                                   TrafficGeneratorPort, \
-                                   TrafficFlowType
+    TrafficGeneratorPort, \
+    TrafficFlowType
 
 
 #
@@ -59,10 +59,7 @@ from xenalib.XenaManager import XenaManager
 #
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 
-#
-# Remove VXLAN for now, as Scapy needed for T-Rex has no VXLAN support.
-#
-from scapy.all import UDP, IP, Ether #, VXLAN
+from scapy.all import UDP, IP, Ether, VXLAN  # noqa: E402
 
 
 #
@@ -84,7 +81,7 @@ class _XenaNetworksPort(TrafficGeneratorPort):
 
     def _int_2_mac(self, mac_int):
         mac_hex = "{:012x}".format(mac_int)
-        return ":".join(mac_hex[i:i+2] for i in range(0, len(mac_hex), 2))
+        return ":".join(mac_hex[i:i + 2] for i in range(0, len(mac_hex), 2))
 
     def _mac_2_int(self, mac_str):
         return int(mac_str.replace(":", ""), 16)
@@ -138,7 +135,7 @@ class _XenaNetworksPort(TrafficGeneratorPort):
             L3 = IP(src="1.0.0.0", dst="2.0.0.0")
             L4 = UDP(chksum=0)
         elif traffic_flows == TrafficFlowType.l3_ipv4 or \
-             traffic_flows == TrafficFlowType.nfv_mobile:
+                traffic_flows == TrafficFlowType.nfv_mobile:
             L2 = Ether(src=traffic_src_mac, dst=traffic_dst_mac)
             L3 = IP(src="1.{}.0.0".format(offset),
                     dst="2.{}.0.0".format(offset))
@@ -158,22 +155,22 @@ class _XenaNetworksPort(TrafficGeneratorPort):
             else:
                 L2 = Ether(src="00:00:00:00:00:01", dst=tunnel_dst_mac)
             L3 = IP(src="3.1.1.2", dst="3.1.1.1")
-            L4 = UDP(sport=32768, dport=4789, chksum=0)/VXLAN(vni=69, NextProtocol=0, flags='Instance')/ \
-                 Ether(src=traffic_src_mac, dst=traffic_dst_mac)/ \
-                 IP(src="1.{}.0.0".format(offset),
-                    dst="2.{}.0.0".format(offset))/UDP(chksum=0)
+            L4 = UDP(sport=32768, dport=4789, chksum=0) / VXLAN(vni=69, NextProtocol=0, flags='Instance') / \
+                Ether(src=traffic_src_mac, dst=traffic_dst_mac) / \
+                IP(src="1.{}.0.0".format(offset),
+                   dst="2.{}.0.0".format(offset)) / UDP(chksum=0)
         else:
             raise ValueError("Unsupported traffic type for Xena tester!!!")
 
-        if (len(L2/L3/L4) + 4) > packet_size:  # +4 for Ethernet CRC
+        if (len(L2 / L3 / L4) + 4) > packet_size:  # +4 for Ethernet CRC
             raise ValueError("Packet size ({} bytes) too small for requested "
                              "packet ({} bytes)!".
-                             format(packet_size, len(L2/L3/L4) + 4))
+                             format(packet_size, len(L2 / L3 / L4) + 4))
         #
         # The hex codec has been discarded in Python 3.x.
         # Use binascii instead(it is Python2 and Python3 compatible):
         #
-        packet_hex = '0x' + binascii.hexlify(bytes(L2/L3/L4)).decode('ascii')
+        packet_hex = '0x' + binascii.hexlify(bytes(L2 / L3 / L4)).decode('ascii')
 
         new_stream = self.__xport.add_stream(stream_id)
         if new_stream is None:
@@ -207,7 +204,7 @@ class _XenaNetworksPort(TrafficGeneratorPort):
             m2_new_stream.set_modifier_range(0, 1, nr_of_flows - 1)
 
         elif traffic_flows == TrafficFlowType.l3_ipv4 or \
-             traffic_flows == TrafficFlowType.nfv_mobile:
+                traffic_flows == TrafficFlowType.nfv_mobile:
             m1_new_stream = new_stream.add_modifier()
             if m1_new_stream is None:
                 self.__xport.del_stream(stream_id)
@@ -359,9 +356,9 @@ class _XenaNetworksPort(TrafficGeneratorPort):
                     flows_to_do = alternate_flows
                     stream_id_start = len(self.__streams) + 1
                     self.__alternate_stream_sets.append(list(range(stream_id_start,
-                                                              stream_id_start +
-                                                              self._div_round_up(alternate_flows,
-                                                                                 0x10000))))
+                                                             stream_id_start +
+                                                             self._div_round_up(alternate_flows,
+                                                                                0x10000))))
                     if alternate_flow_sets == 0:
                         suppress = False
                     else:
