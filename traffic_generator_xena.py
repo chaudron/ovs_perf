@@ -127,6 +127,7 @@ class _XenaNetworksPort(TrafficGeneratorPort):
         tunnel_dst_mac = kwargs.pop("tunnel_dst_mac", None)
         traffic_dst_mac = kwargs.pop("traffic_dst_mac", '00:00:02:00:00:00')
         traffic_src_mac = kwargs.pop("traffic_src_mac", '00:00:01:00:00:00')
+        random_payload = kwargs.pop("random_payload", False)
 
         if traffic_flows == TrafficFlowType.l2_mac:
             src_mac = (self._mac_2_int(traffic_src_mac) & 0xffffff000000) + \
@@ -190,7 +191,10 @@ class _XenaNetworksPort(TrafficGeneratorPort):
         new_stream.set_rate_fraction(fraction=stream_percentage)
         new_stream.set_packet_header(packet_hex)
         new_stream.set_packet_length_fixed(packet_size, 1518)
-        new_stream.set_packet_payload_incrementing('0x00')
+        if random_payload:
+            new_stream.set_packet_payload_prbs('0x00')
+        else:
+            new_stream.set_packet_payload_incrementing('0x00')
         new_stream.set_packet_protocol('ETHERNET', 'IP')
         new_stream.disable_test_payload_id()
         new_stream.set_frame_csum_on()
@@ -392,13 +396,17 @@ class _XenaNetworksPort(TrafficGeneratorPort):
                         stream_percentage = (alternate_flow_percentage *
                                              flows_this_run) / alternate_flows
 
-                        if not self._configure_xena_stream(stream,
-                                                           traffic_flows,
-                                                           stream - 1,
-                                                           flows_this_run,
-                                                           packet_size,
-                                                           stream_percentage,
-                                                           suppress):
+                        if not self._configure_xena_stream(
+                                stream,
+                                traffic_flows,
+                                stream - 1,
+                                flows_this_run,
+                                packet_size,
+                                stream_percentage,
+                                suppress,
+                                random_payload=kwargs.pop(
+                                    "random_payload", False)
+                        ):
                             self._delete_traffic_stream_config()
                             return False
 

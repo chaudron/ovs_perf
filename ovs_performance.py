@@ -364,7 +364,9 @@ def test_p2v2p_single_packet_size(nr_of_flows, packet_size, **kwargs):
                                     nr_of_flows, packet_size,
                                     traffic_dst_mac=config.dst_mac_address,
                                     traffic_src_mac=config.src_mac_address,
-                                    percentage=1000000 - decrease_rate)
+                                    percentage=1000000 - decrease_rate,
+                                    random_payload=config.payload_packet_random
+                                    )
 
     ##################################################
     if config.warm_up:
@@ -555,12 +557,14 @@ def test_p2v(nr_of_flows, packet_sizes):
 
         ##################################################
         lprint("  * Initializing packet generation...")
-        tester.configure_traffic_stream(config.tester_interface,
-                                        get_traffic_generator_flow(),
-                                        nr_of_flows, packet_size,
-                                        traffic_dst_mac=config.dst_mac_address,
-                                        traffic_src_mac=config.src_mac_address,
-                                        percentage=config.traffic_rate * 10000)
+        tester.configure_traffic_stream(
+            config.tester_interface,
+            get_traffic_generator_flow(),
+            nr_of_flows, packet_size,
+            traffic_dst_mac=config.dst_mac_address,
+            traffic_src_mac=config.src_mac_address,
+            percentage=config.traffic_rate * 10000,
+            random_payload=config.payload_packet_random)
 
         ##################################################
         if config.warm_up:
@@ -692,12 +696,14 @@ def test_p2p(nr_of_flows, packet_sizes):
 
         ##################################################
         lprint("  * Initializing packet generation...")
-        tester.configure_traffic_stream(config.tester_interface,
-                                        get_traffic_generator_flow(),
-                                        nr_of_flows, packet_size,
-                                        traffic_dst_mac=config.dst_mac_address,
-                                        traffic_src_mac=config.src_mac_address,
-                                        percentage=config.traffic_rate * 10000)
+        tester.configure_traffic_stream(
+            config.tester_interface,
+            get_traffic_generator_flow(),
+            nr_of_flows, packet_size,
+            traffic_dst_mac=config.dst_mac_address,
+            traffic_src_mac=config.src_mac_address,
+            percentage=config.traffic_rate * 10000,
+            random_payload=config.payload_packet_random)
 
         ##################################################
         if config.warm_up:
@@ -843,7 +849,9 @@ def test_p_single_packet_size(nr_of_flows, packet_size, **kwargs):
                                     nr_of_flows, packet_size,
                                     traffic_dst_mac=config.dst_mac_address,
                                     traffic_src_mac=config.src_mac_address,
-                                    percentage=1000000 - decrease_rate)
+                                    percentage=1000000 - decrease_rate,
+                                    random_payload=config.payload_packet_random
+                                    )
 
     ##################################################
     if config.warm_up:
@@ -1238,12 +1246,14 @@ def test_vxlan(nr_of_flows, packet_sizes):
 
         ##################################################
         lprint("  * Initializing packet generation...")
-        tester.configure_traffic_stream(config.tester_interface,
-                                        TrafficFlowType.vxlan_l3_ipv4,
-                                        nr_of_flows, packet_size,
-                                        tunnel_dst_mac=tunnel_dst_mac,
-                                        traffic_dst_mac=config.dst_mac_address,
-                                        percentage=config.traffic_rate * 10000)
+        tester.configure_traffic_stream(
+            config.tester_interface,
+            TrafficFlowType.vxlan_l3_ipv4,
+            nr_of_flows, packet_size,
+            tunnel_dst_mac=tunnel_dst_mac,
+            traffic_dst_mac=config.dst_mac_address,
+            percentage=config.traffic_rate * 10000,
+            random_payload=config.payload_packet_random)
 
         ##################################################
         lprint("  * Clear all statistics...")
@@ -3590,31 +3600,33 @@ def main():
     parser.add_argument("--debug-tester",
                         help="Enable tester debugging", action="store_true")
     parser.add_argument("--pmd-rxq-affinity", metavar="AFINITY",
-                        help="Set pmd-rxq-affinity when script configures bridges", type=str)
+                        help="Set pmd-rxq-affinity when script configures "
+                        "bridges", type=str)
     parser.add_argument("--dut-vm-address", metavar="ADDRESS",
-                        help="IP address of VM running on OpenVSwitch DUT", type=str,
-                        default=DEFAULT_DUT_VM_ADDRESS)
+                        help="IP address of VM running on OpenVSwitch DUT",
+                        type=str, default=DEFAULT_DUT_VM_ADDRESS)
     parser.add_argument("--dut-vm-nic-pci", metavar="PCI",
                         help="PCI address of VMs virtual NIC", type=str,
                         default=DEFAULT_DUT_VM_NIC_PCI_ADDRESS)
     parser.add_argument("--dut-vm-user", metavar="USER",
-                        help="User name of VM running on OpenVSwitch DUT", type=str,
-                        default=DEFAULT_DUT_VM_LOGIN_USER)
+                        help="User name of VM running on OpenVSwitch DUT",
+                        type=str, default=DEFAULT_DUT_VM_LOGIN_USER)
     parser.add_argument("--dut-vm-password", metavar="PASSWORD",
-                        help="User name of VM running on OpenVSwitch DUT", type=str,
-                        default=DEFAULT_DUT_VM_LOGIN_PASSWORD)
+                        help="User name of VM running on OpenVSwitch DUT",
+                        type=str, default=DEFAULT_DUT_VM_LOGIN_PASSWORD)
     parser.add_argument("--dut-vm-nic-queues", metavar="QUEUES",
-                        help="Number of VM nic queues (and cores) to allocate, default 1",
-                        type=int, default=1)
+                        help="Number of VM nic queues (and cores) to "
+                        "allocate, default 1", type=int, default=1)
     parser.add_argument("--dut-vm-nic-rxd", metavar="DESCRIPTORS",
-                        help="Number of VM nic receive descriptors, default 4096",
-                        type=int, default=4096)
+                        help="Number of VM nic receive descriptors, "
+                        "default 4096", type=int, default=4096)
     parser.add_argument("--dut-vm-nic-txd", metavar="DESCRIPTORS",
-                        help="Number of VM nic transmit descriptors, default 1024",
-                        type=int, default=1024)
+                        help="Number of VM nic transmit descriptors, "
+                        "default 1024", type=int, default=1024)
     # Removed VV test for now, as it needs non-upstream trafgen tool
     # parser.add_argument("--dut-second-vm-address", metavar="ADDRESS",
-    #                    help="IP address of second VM running on OpenVSwitch DUT", type=str,
+    #                    help="IP address of second VM running on "
+    #                    "OpenVSwitch DUT", type=str,
     #                    default=DEFAULT_DUT_SECOND_VM_ADDRESS)
     # parser.add_argument("--dut-second-vm-nic-pci", metavar="PCI",
     #                    help="PCI address of VMs virtual NIC", type=str,
@@ -3641,6 +3653,10 @@ def main():
     parser.add_argument("-p", "--physical-interface", metavar="DEVICE",
                         help="Physical interface", type=str,
                         default=DEFAULT_PHYSICAL_INTERFACE)
+    parser.add_argument("--payload-packet-random",
+                        help="Generate per packet random payload data "
+                        "instead of the default incremental bytes",
+                        action="store_true")
     parser.add_argument("--perf",
                         help="Enable perf profiling", action="store_true")
     parser.add_argument("--physical-interface-pci", metavar="PCI",
@@ -3756,27 +3772,30 @@ def main():
     #
     # Setting up the logger
     #
-    logging.basicConfig(format='%(asctime)s[%(levelname)-8.8s][%(name)s]: %(message)s',
-                        datefmt='%H:%M:%S',
-                        level=logging.ERROR,
-                        filename=config.logging)
+    logging.basicConfig(
+        format='%(asctime)s[%(levelname)-8.8s][%(name)s]: %(message)s',
+        datefmt='%H:%M:%S',
+        level=logging.ERROR,
+        filename=config.logging)
 
     slogger = logging.getLogger('script')
     slogger.setLevel(logging.INFO)
 
-    slogger.info("**********************************************************************")
+    slogger.info("*" * 69)
     slogger.info("** Starting \"%s\"", os.path.basename(__file__))
-    slogger.info("**********************************************************************")
+    slogger.info("*" * 69)
 
     #
     # Check some input parameters
     #
     if config.ovs_address == '':
-        lprint("ERROR: You must supply the OVS host address to use for testing!")
+        lprint(
+            "ERROR: You must supply the OVS host address to use for testing!")
         sys.exit(-1)
 
     if is_vm_needed_for_tests() and config.dut_vm_address == '':
-        lprint("ERROR: You must supply the DUT VM host address to use for testing!")
+        lprint("ERROR: You must supply the DUT VM host address to use for "
+               "testing!")
         sys.exit(-1)
 
     if config.dst_mac_address == '':
@@ -3805,7 +3824,8 @@ def main():
         sys.exit(-1)
 
     if not config.skip_vv_test and config.second_virtual_interface == '':
-        lprint("ERROR: You must supply a second virtual interface to use for testing!")
+        lprint("ERROR: You must supply a second virtual interface to use for "
+               "testing!")
         sys.exit(-1)
 
     if not config.skip_vv_test and config.dut_second_vm_address == '':
@@ -3814,35 +3834,43 @@ def main():
 
     if not config.skip_vv_test and \
        not check_pci_address_string(config.dut_second_vm_nic_pci):
-        lprint("ERROR: You must supply a valid PCI address for the second VMs NIC!")
+        lprint("ERROR: You must supply a valid PCI address for the second "
+               "VMs NIC!")
         sys.exit(-1)
 
     if config.dut_second_vm_address != '' and config.dut_vm_nic_pci == '':
-        lprint("ERROR: You must supply the second DUT VM host's NIC PCI address!")
+        lprint(
+            "ERROR: You must supply the second DUT VM host's NIC PCI address!")
         sys.exit(-1)
 
     if config.physical_interface == '':
-        lprint("ERROR: You must supply the physical interface to use for testing!")
+        lprint("ERROR: You must supply the physical interface to use for "
+               "testing!")
         sys.exit(-1)
 
     if config.run_pp_test and config.second_physical_interface == '':
-        lprint("ERROR: You must supply the second physical interface to use for testing!")
+        lprint("ERROR: You must supply the second physical interface to use "
+               "for testing!")
         sys.exit(-1)
 
     if is_vm_needed_for_tests() and config.virtual_interface == '':
-        lprint("ERROR: You must supply the virtual interface to use for testing!")
+        lprint(
+            "ERROR: You must supply the virtual interface to use for testing!")
         sys.exit(-1)
 
     if config.tester_address == '':
-        lprint("ERROR: You must supply the tester's address to use for testing!")
+        lprint(
+            "ERROR: You must supply the tester's address to use for testing!")
         sys.exit(-1)
 
     if config.tester_interface == '':
-        lprint("ERROR: You must supply the tester's interface to use for testing!")
+        lprint("ERROR: You must supply the tester's interface to use for "
+               "testing!")
         sys.exit(-1)
 
     if config.run_pp_test and config.second_tester_interface == '':
-        lprint("ERROR: You must supply the second tester's interface to use for testing!")
+        lprint("ERROR: You must supply the second tester's interface to use "
+               "for testing!")
         sys.exit(-1)
 
     if not tester_interface_valid(config.tester_interface):
@@ -3855,16 +3883,19 @@ def main():
         sys.exit(-1)
 
     if not check_list(config.stream_list, 1, 1000000):
-        lprint("ERROR: Invalid stream list, \"{}\", supplied!".format(config.stream_list))
+        lprint("ERROR: Invalid stream list, \"{}\", supplied!".format(
+            config.stream_list))
         sys.exit(-1)
 
-    if config.flow_type == 'L4-UDP' and not check_list(config.stream_list, 1, 65535):
+    if config.flow_type == 'L4-UDP' and not \
+       check_list(config.stream_list, 1, 65535):
         lprint("ERROR: Invalid stream list, \"{}\", supplied for L4 flows!".
                format(config.stream_list))
         sys.exit(-1)
 
     if not check_list(config.packet_list, 64, 9000):
-        lprint("ERROR: Invalid packet list, \"{}\", supplied!".format(config.packet_list))
+        lprint("ERROR: Invalid packet list, \"{}\", supplied!".format(
+            config.packet_list))
         sys.exit(-1)
 
     if config.run_time < 20 or config.run_time > 3600:
@@ -3901,7 +3932,8 @@ def main():
         #
         # ETH + IPv4 + UDP + VXLAN + ETH + IPv4 + UDP + ETH_CRC
         #
-        lprint("ERROR: Minimal packet size for the VXLAN test should be 96 bytes!")
+        lprint("ERROR: Minimal packet size for the VXLAN test should be 96 "
+               "bytes!")
         sys.exit(-1)
 
     if config.warm_up and (not config.skip_vv_test or config.run_vxlan_test):
@@ -3931,6 +3963,11 @@ def main():
        config.dut_vm_nic_queues < 2:
         lprint("ERROR: When using less than 2 VM NIC queues the "
                "--testpmd-startup-delay can not be AUTO(0)!")
+        sys.exit(-1)
+
+    if config.tester_type == 'trex' and config.payload_packet_random:
+        lprint("ERROR: The trex tester type currently does not support "
+               "the --payload-packet-random option!")
         sys.exit(-1)
 
     #
