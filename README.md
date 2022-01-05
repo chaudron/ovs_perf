@@ -98,13 +98,10 @@ Download and unpack the TRex traffic generator:
 ```
 mkdir trex
 cd trex
-wget --no-check-certificate https://trex-tgn.cisco.com/trex/release/v2.53.tar.gz
-tar -xvzf v2.53.tar.gz
-cd v2.53
+wget --no-check-certificate https://trex-tgn.cisco.com/trex/release/v2.90.tar.gz
+tar -xvzf v2.90.tar.gz
+cd v2.90
 ```
-
-Note that when using Python 3.7 a minimum version of v2.61 is required.
-v2.80 has been successfully run on Fedora 31 with Python 3.7.6.
 
 Figure out PCI address of the card we would like to use, using the _lshw_
 utility:
@@ -130,7 +127,7 @@ might fail.
 Next step is to configure TRex:
 
 ```
-# cd ~/trex/v2.53
+# cd ~/trex/v2.90
 # ./dpdk_setup_ports.py -i
 By default, IP based configuration file will be created. Do you want to use MAC based config? (y/N)y
 +----+------+---------+-------------------+------------------------------------------------+-----------+-----------+----------+
@@ -216,7 +213,7 @@ Now we're ready to start the TRex server in a tmux session, so we can look at
 the console if we want to:
 
 ```
-cd ~/trex/v2.53
+cd ~/trex/v2.90
 tmux
 ./t-rex-64 -c 4 -i --no-scapy-server
 ```
@@ -259,8 +256,8 @@ python setup.py install
 Finally we need to install the TRex stateless libraries:
 
 ```
-cd ~/trex/v2.53
-tar -xzf trex_client_v2.53.tar.gz
+cd ~/trex/v2.90
+tar -xzf trex_client_v2.90.tar.gz
 cp -r trex_client/interactive/trex/ ~/ovs_perf/trex/
 cp -r trex_client/external_libs/ ~/ovs_perf/trex/external_libs/
 ```
