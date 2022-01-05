@@ -111,29 +111,29 @@ if sys.version_info[0] == 3:
 #
 # Default configuration
 #
-DEFAULT_TESTER_TYPE               = 'xena'
-DEFAULT_TESTER_SERVER_ADDRESS     = ''
-DEFAULT_TESTER_INTERFACE          = ''
-DEFAULT_SECOND_TESTER_INTERFACE   = ''
-DEFAULT_DUT_ADDRESS               = ''
-DEFAULT_DUT_LOGIN_USER            = 'root'
-DEFAULT_DUT_LOGIN_PASSWORD        = 'root'
-DEFAULT_DUT_VM_ADDRESS            = ''
-DEFAULT_DUT_SECOND_VM_ADDRESS     = ''
-DEFAULT_DUT_VM_NIC_PCI_ADDRESS    = ''
-DEFAULT_DUT_VM_LOGIN_USER         = 'root'
-DEFAULT_DUT_VM_LOGIN_PASSWORD     = 'root'
-DEFAULT_PHYSICAL_INTERFACE        = ''
+DEFAULT_TESTER_TYPE = 'xena'
+DEFAULT_TESTER_SERVER_ADDRESS = ''
+DEFAULT_TESTER_INTERFACE = ''
+DEFAULT_SECOND_TESTER_INTERFACE = ''
+DEFAULT_DUT_ADDRESS = ''
+DEFAULT_DUT_LOGIN_USER = 'root'
+DEFAULT_DUT_LOGIN_PASSWORD = 'root'
+DEFAULT_DUT_VM_ADDRESS = ''
+DEFAULT_DUT_SECOND_VM_ADDRESS = ''
+DEFAULT_DUT_VM_NIC_PCI_ADDRESS = ''
+DEFAULT_DUT_VM_LOGIN_USER = 'root'
+DEFAULT_DUT_VM_LOGIN_PASSWORD = 'root'
+DEFAULT_PHYSICAL_INTERFACE = ''
 DEFAULT_SECOND_PHYSICAL_INTERFACE = ''
-DEFAULT_PACKET_LIST               = '64, 128, 256, 512, 768, 1024, 1514'
-DEFAULT_VIRTUAL_INTERFACE         = ''
-DEFAULT_SECOND_VIRTUAL_INTERFACE  = ''
-DEFAULT_RUN_TIME                  = 20
-DEFAULT_STREAM_LIST               = '10, 1000, 10000, 100000, 1000000'
-DEFAULT_BRIDGE_NAME               = 'ovs_pvp_br0'
-DEFAULT_WARM_UP_TIMEOUT           = 360
-DEFAULT_DST_MAC_ADDRESS           = '00:00:02:00:00:00'
-DEFAULT_SRC_MAC_ADDRESS           = '00:00:01:00:00:00'
+DEFAULT_PACKET_LIST = '64, 128, 256, 512, 768, 1024, 1514'
+DEFAULT_VIRTUAL_INTERFACE = ''
+DEFAULT_SECOND_VIRTUAL_INTERFACE = ''
+DEFAULT_RUN_TIME = 20
+DEFAULT_STREAM_LIST = '10, 1000, 10000, 100000, 1000000'
+DEFAULT_BRIDGE_NAME = 'ovs_pvp_br0'
+DEFAULT_WARM_UP_TIMEOUT = 360
+DEFAULT_DST_MAC_ADDRESS = '00:00:02:00:00:00'
+DEFAULT_SRC_MAC_ADDRESS = '00:00:01:00:00:00'
 
 
 #
@@ -239,10 +239,8 @@ def calc_loss_percentage(results):
     value = 100 - (float(results["total_rx_pkts"])
                    / float(results["total_tx_pkts"])
                    * 100)
-    if value < 0:
-        value = 0
 
-    return value
+    return max(value, 0)
 
 
 #
@@ -1213,7 +1211,7 @@ def test_vxlan(nr_of_flows, packet_sizes):
         ##################################################
         lprint("- [TEST: {0}(flows={1}, packet_size={2}, rate={3:.3f}%)]"
                " START".format(inspect.currentframe().f_code.co_name,
-                               nr_of_flows, packet_size))
+                               nr_of_flows, packet_size, config.traffic_rate))
 
         ##################################################
         lprint("  * Get bridge MAC address...")
@@ -1807,7 +1805,7 @@ def create_ovs_bidirectional_of_phy_rules(src_port, dst_port):
                              die_on_error=True)
 
     if result.output.count('\n') != 2:
-        lprint("ERROR: Only 2 flows should exsits, but there are {1}!".
+        lprint("ERROR: Only 2 flows should exsits, but there are {0}!".
                format(result.output.count('\n') - 1))
         sys.exit(-1)
 
@@ -1838,7 +1836,7 @@ def create_ovs_of_phy_rule(src_port, dst_port, **kwargs):
                              die_on_error=True)
 
     if result.output.count('\n') != 1:
-        lprint("ERROR: Only 2 flows should exsits, but there are {1}!".
+        lprint("ERROR: Only 2 flows should exsits, but there are {0}!".
                format(result.output.count('\n') - 1))
         sys.exit(-1)
 
@@ -2492,8 +2490,9 @@ def get_of_port_packet_stats(of_port, **kwargs):
                .format(of_port, config.bridge_name))
         sys.exit(-1)
 
-    slogger.debug("OF port {0} stats: tx = {1}, tx_drop = {2}, rx = {3}, tx_drop = {3}".
-                  format(of_port, tx, tx_drop, rx, rx_drop))
+    slogger.debug("OF port {0} stats: tx = {1}, tx_drop = {2}, "
+                  "rx = {3}, rx_drop = {4}".format(of_port, tx, tx_drop,
+                                                   rx, rx_drop))
 
     return tx, tx_drop, rx, rx_drop
 
@@ -3322,8 +3321,8 @@ def get_cpu_monitoring_stats():
         cpu_gnice += float(match.group(9))
         cpu_idle += float(match.group(10))
 
-    cpu_total = int(cpu_usr + cpu_nice + cpu_sys + cpu_iowait + \
-                    cpu_irq + cpu_soft + cpu_steal + cpu_guest + \
+    cpu_total = int(cpu_usr + cpu_nice + cpu_sys + cpu_iowait +
+                    cpu_irq + cpu_soft + cpu_steal + cpu_guest +
                     cpu_gnice + cpu_idle)
 
     ovs_cpu_total = ovs_cpu_pmd + ovs_cpu_revalidator + ovs_cpu_handler + \
@@ -3355,8 +3354,7 @@ def get_cpu_monitoring_stats():
 # Get ovs version
 #
 def get_ovs_version():
-    result = dut_shell.dut_exec('sh -c "ovs-vswitchd --version"'.
-                                format(config.bridge_name),
+    result = dut_shell.dut_exec('sh -c "ovs-vswitchd --version"',
                                 die_on_error=True)
 
     m = re.search('.*([0-9]+.[0-9]+.[0-9]+).*',
@@ -3419,8 +3417,7 @@ def get_ovs_datapath():
     m = re.search('(.+@.*{}):.*'.format(config.bridge_name),
                   output)
     if m:
-        m = re.search('(.+)@.*'.format(config.bridge_name),
-                      m.group(1))
+        m = re.search('(.+)@.*', m.group(1))
 
         return m.group(1)
 

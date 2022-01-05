@@ -43,8 +43,8 @@ import binascii
 # External traffic generators
 #
 from traffic_generator_base import TrafficGeneratorChassis, \
-                                   TrafficGeneratorPort, \
-                                   TrafficFlowType
+    TrafficGeneratorPort, \
+    TrafficFlowType
 
 
 #
@@ -62,7 +62,7 @@ logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
 #
 # Remove VXLAN for now, as Scapy needed for T-Rex has no VXLAN support.
 #
-from scapy.all import UDP, IP, Ether #, VXLAN
+from scapy.all import UDP, IP, Ether, VXLAN  # noqa: E402
 
 
 #
@@ -84,7 +84,8 @@ class _XenaNetworksPort(TrafficGeneratorPort):
 
     def _int_2_mac(self, mac_int):
         mac_hex = "{:012x}".format(mac_int)
-        return ":".join(mac_hex[i:i+2] for i in range(0, len(mac_hex), 2))
+        return ":".join(mac_hex[i:i+2] for i in range(0, len(mac_hex), 2)) \
+            # noqa: E226
 
     def _mac_2_int(self, mac_str):
         return int(mac_str.replace(":", ""), 16)
@@ -137,8 +138,8 @@ class _XenaNetworksPort(TrafficGeneratorPort):
             L2 = Ether(src=src_mac, dst=dst_mac)
             L3 = IP(src="1.0.0.0", dst="2.0.0.0")
             L4 = UDP(chksum=0)
-        elif traffic_flows == TrafficFlowType.l3_ipv4 or \
-             traffic_flows == TrafficFlowType.nfv_mobile:
+        elif (traffic_flows == TrafficFlowType.l3_ipv4 or
+              traffic_flows == TrafficFlowType.nfv_mobile):
             L2 = Ether(src=traffic_src_mac, dst=traffic_dst_mac)
             L3 = IP(src="1.{}.0.0".format(offset),
                     dst="2.{}.0.0".format(offset))
@@ -152,28 +153,30 @@ class _XenaNetworksPort(TrafficGeneratorPort):
             # Error out here for now, as we have a Scapy version dependency
             # which does not include the VXLAN().
             #
-            raise ValueError("VXLAN currently not supported for Xena tester!!!")
+            raise ValueError("VXLAN currently not supported for Xena tester!!")
             if tunnel_dst_mac is None:
                 L2 = Ether(src="00:00:00:00:00:01", dst="00:00:00:00:00:02")
             else:
                 L2 = Ether(src="00:00:00:00:00:01", dst=tunnel_dst_mac)
             L3 = IP(src="3.1.1.2", dst="3.1.1.1")
-            L4 = UDP(sport=32768, dport=4789, chksum=0)/VXLAN(vni=69, NextProtocol=0, flags='Instance')/ \
-                 Ether(src=traffic_src_mac, dst=traffic_dst_mac)/ \
-                 IP(src="1.{}.0.0".format(offset),
-                    dst="2.{}.0.0".format(offset))/UDP(chksum=0)
+            L4 = UDP(sport=32768, dport=4789, chksum=0) / \
+                VXLAN(vni=69, NextProtocol=0, flags='Instance') / \
+                Ether(src=traffic_src_mac, dst=traffic_dst_mac) / \
+                IP(src="1.{}.0.0".format(offset),
+                   dst="2.{}.0.0".format(offset)) / UDP(chksum=0)
         else:
             raise ValueError("Unsupported traffic type for Xena tester!!!")
 
-        if (len(L2/L3/L4) + 4) > packet_size:  # +4 for Ethernet CRC
+        if (len(L2 / L3 / L4) + 4) > packet_size:  # +4 for Ethernet CRC
             raise ValueError("Packet size ({} bytes) too small for requested "
                              "packet ({} bytes)!".
-                             format(packet_size, len(L2/L3/L4) + 4))
+                             format(packet_size, len(L2 / L3 / L4) + 4))
         #
         # The hex codec has been discarded in Python 3.x.
         # Use binascii instead(it is Python2 and Python3 compatible):
         #
-        packet_hex = '0x' + binascii.hexlify(bytes(L2/L3/L4)).decode('ascii')
+        packet_hex = '0x' + \
+            binascii.hexlify(bytes(L2 / L3 / L4)).decode('ascii')
 
         new_stream = self.__xport.add_stream(stream_id)
         if new_stream is None:
@@ -206,8 +209,8 @@ class _XenaNetworksPort(TrafficGeneratorPort):
             m2_new_stream.set_modifier(10, 0xffff0000, 'inc', 1)
             m2_new_stream.set_modifier_range(0, 1, nr_of_flows - 1)
 
-        elif traffic_flows == TrafficFlowType.l3_ipv4 or \
-             traffic_flows == TrafficFlowType.nfv_mobile:
+        elif (traffic_flows == TrafficFlowType.l3_ipv4 or
+              traffic_flows == TrafficFlowType.nfv_mobile):
             m1_new_stream = new_stream.add_modifier()
             if m1_new_stream is None:
                 self.__xport.del_stream(stream_id)
@@ -300,7 +303,8 @@ class _XenaNetworksPort(TrafficGeneratorPort):
             #
 
             if nr_of_flows > (32 * 0x10000):
-                raise ValueError("Xena has only two 32 streams with 16bit counters!!!")
+                raise ValueError(
+                    "Xena has only two 32 streams with 16bit counters!!!")
 
             #
             # Max flows due to IPv4 address limit, and addresses used for tests
@@ -309,13 +313,16 @@ class _XenaNetworksPort(TrafficGeneratorPort):
                 raise ValueError("To many flows requested, max {} supported!".
                                  format(0x00ffffff))
 
-            if traffic_flows == TrafficFlowType.l4_udp and nr_of_flows > 0xffff:
-                raise ValueError("To many L4 flows requested, max {} supported!".
-                                 format(0xffff))
+            if traffic_flows == TrafficFlowType.l4_udp and \
+               nr_of_flows > 0xffff:
+                raise ValueError(
+                    "To many L4 flows requested, max {} supported!".format(
+                        0xffff))
 
             #
             #
-            # If the number of flows up into streams, each having 0x10000 flows.
+            # If the number of flows up into streams, each having 0x10000
+            # flows.
             #
             # TODO: We need to optimize this because the last stream might have
             #       a low number of flows, causing the percentage to be small,
@@ -328,17 +335,21 @@ class _XenaNetworksPort(TrafficGeneratorPort):
             # Explicit typecast to int to avoid the following error:
             # TypeError: 'float' object cannot be interpreted as an integer
             #
-            for stream in range(1, int(self._div_round_up(nr_of_flows, 0x10000)) + 1):
+            for stream in range(
+                    1, int(self._div_round_up(nr_of_flows, 0x10000)) + 1):
+
                 if flows_to_do > 0x10000:
                     flows_this_run = 0x10000
                 else:
                     flows_this_run = flows_to_do
                 flows_to_do -= flows_this_run
 
-                stream_percentage = (flow_percentage * flows_this_run) / nr_of_flows
+                stream_percentage = ((flow_percentage * flows_this_run) /
+                                     nr_of_flows)
                 if not self._configure_xena_stream(stream, traffic_flows,
                                                    stream - 1, flows_this_run,
-                                                   packet_size, stream_percentage,
+                                                   packet_size,
+                                                   stream_percentage,
                                                    False, **kwargs):
                     self._delete_traffic_stream_config()
                     return False
@@ -358,10 +369,11 @@ class _XenaNetworksPort(TrafficGeneratorPort):
                 for alternate_flow_sets in range(0, 3):
                     flows_to_do = alternate_flows
                     stream_id_start = len(self.__streams) + 1
-                    self.__alternate_stream_sets.append(list(range(stream_id_start,
-                                                              stream_id_start +
-                                                              self._div_round_up(alternate_flows,
-                                                                                 0x10000))))
+                    self.__alternate_stream_sets.append(
+                        list(range(stream_id_start,
+                                   stream_id_start +
+                                   self._div_round_up(alternate_flows,
+                                                      0x10000))))
                     if alternate_flow_sets == 0:
                         suppress = False
                     else:
@@ -377,12 +389,15 @@ class _XenaNetworksPort(TrafficGeneratorPort):
                             flows_this_run = flows_to_do
 
                         flows_to_do -= flows_this_run
-                        stream_percentage = (alternate_flow_percentage * flows_this_run) / \
-                            alternate_flows
+                        stream_percentage = (alternate_flow_percentage *
+                                             flows_this_run) / alternate_flows
 
-                        if not self._configure_xena_stream(stream, traffic_flows,
-                                                           stream - 1, flows_this_run,
-                                                           packet_size, stream_percentage,
+                        if not self._configure_xena_stream(stream,
+                                                           traffic_flows,
+                                                           stream - 1,
+                                                           flows_this_run,
+                                                           packet_size,
+                                                           stream_percentage,
                                                            suppress):
                             self._delete_traffic_stream_config()
                             return False
@@ -392,7 +407,8 @@ class _XenaNetworksPort(TrafficGeneratorPort):
         elif traffic_flows == TrafficFlowType.none:
             return True
         else:
-            raise ValueError("Unsupported traffic flow passed for Xena Networks tester!")
+            raise ValueError(
+                "Unsupported traffic flow passed for Xena Networks tester!")
 
         return False
 
@@ -407,16 +423,19 @@ class _XenaNetworksPort(TrafficGeneratorPort):
         # but Xena is rather slow doing this leaving our average bandwidth
         # way lower than the configured value.
         #
-        # for stream in self.__alternate_stream_sets[self.__active_alternate_stream]:
+        # for stream in self.__alternate_stream_sets[
+        #         self.__active_alternate_stream]:
         #    self.__streams[stream].set_stream_suppress()
         #
 
-        old_streams = self.__alternate_stream_sets[self.__active_alternate_stream]
+        old_streams = self.__alternate_stream_sets[
+            self.__active_alternate_stream]
 
-        self.__active_alternate_stream = (self.__active_alternate_stream + 1) % \
-            len(self.__alternate_stream_sets)
+        self.__active_alternate_stream = ((self.__active_alternate_stream + 1)
+                                          % len(self.__alternate_stream_sets))
 
-        for stream in self.__alternate_stream_sets[self.__active_alternate_stream]:
+        for stream in self.__alternate_stream_sets[
+                self.__active_alternate_stream]:
             self.__streams[stream].set_stream_on()
 
         for stream in old_streams:
@@ -561,10 +580,8 @@ class XenaNetworks(TrafficGeneratorChassis):
     def configure_traffic_stream(self, port_name, traffic_flows,
                                  nr_of_flows, packet_size, **kwargs):
         if self._verify_port_action(port_name):
-            return self.port_data[port_name].configure_traffic_stream(traffic_flows,
-                                                                      nr_of_flows,
-                                                                      packet_size,
-                                                                      **kwargs)
+            return self.port_data[port_name].configure_traffic_stream(
+                traffic_flows, nr_of_flows, packet_size, **kwargs)
         return False
 
     def next_traffic_stream(self, port_name):

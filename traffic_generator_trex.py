@@ -41,8 +41,8 @@ import time
 # External traffic generators
 #
 from traffic_generator_base import TrafficGeneratorChassis, \
-                                   TrafficGeneratorPort, \
-                                   TrafficFlowType
+    TrafficGeneratorPort, \
+    TrafficFlowType
 
 #
 # Import TRex static traffic library, in addition tell it where to find the
@@ -53,14 +53,14 @@ os.environ['TREX_EXT_LIBS'] = os.path.normpath(os.path.join(
     "./trex/external_libs/"))
 
 from trex.stl.api import STLClient, STLError, STLPktBuilder, STLStream, \
-    STLTXCont, STLVmFixIpv4, STLVmFlowVar, STLVmWrFlowVar
+    STLTXCont, STLVmFixIpv4, STLVmFlowVar, STLVmWrFlowVar  # noqa: E402
 
 
 #
 # Imports from Scapy
 #
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
-from scapy.all import UDP, IP, Ether
+from scapy.all import UDP, IP, Ether  # noqa: E402
 
 
 #
@@ -189,10 +189,10 @@ class _TRexPort(TrafficGeneratorPort):
                     dst="2.0.0.0")
             L4 = UDP(chksum=0)
 
-            if (len(L2/L3/L4) + 4) > packet_size:  # +4 for Ethernet CRC
+            if (len(L2 / L3 / L4) + 4) > packet_size:  # +4 for Ethernet CRC
                 raise ValueError("Packet size ({} bytes) too small for"
                                  "requested packet ({} bytes)!".
-                                 format(packet_size, len(L2/L3/L4) + 4))
+                                 format(packet_size, len(L2 / L3 / L4) + 4))
 
             if traffic_flows == TrafficFlowType.l2_mac:
                 src_base = self._mac_2_int(trex_src_mac) & 0xff000000
@@ -275,21 +275,23 @@ class _TRexPort(TrafficGeneratorPort):
                 ]
 
             else:
-                raise ValueError("Unsupported traffic type for T-Rex tester!!!")
+                raise ValueError(
+                    "Unsupported traffic type for T-Rex tester!!!")
 
             if traffic_flows == TrafficFlowType.nfv_mobile:
                 stream_percentage = flow_percentage / 2
             else:
                 stream_percentage = flow_percentage
 
-            headers = L2/L3/L4
+            headers = L2 / L3 / L4
             padding = max(0, (packet_size - len(headers))) * 'e'
-            packet = headers/padding
+            packet = headers / padding
 
             trex_packet = STLPktBuilder(pkt=packet, vm=vm)
 
             trex_stream = STLStream(packet=trex_packet,
-                                    mode=STLTXCont(percentage=stream_percentage))
+                                    mode=STLTXCont(
+                                        percentage=stream_percentage))
 
             self.__trex_client.add_streams(trex_stream,
                                            ports=[self.__trex_port])
@@ -364,15 +366,17 @@ class _TRexPort(TrafficGeneratorPort):
                     trex_packet = STLPktBuilder(pkt=packet, vm=vm)
 
                     stream = STLStream(packet=trex_packet,
-                                       mode=STLTXCont(percentage=stream_percentage),
+                                       mode=STLTXCont(
+                                           percentage=stream_percentage),
                                        start_paused=False
                                        if alternate_flow_sets == 0 else True)
 
                     self.__alternate_stream_sets.append(
-                        self.__trex_client.add_streams(stream,
-                                                       ports=[self.__trex_port]))
+                        self.__trex_client.add_streams(
+                            stream, ports=[self.__trex_port]))
 
-                    start_stream_id += self._div_round_up(alternate_flows, 0x10000)
+                    start_stream_id += self._div_round_up(alternate_flows,
+                                                          0x10000)
 
             self.__traffic_flows = traffic_flows
             return True
@@ -380,7 +384,8 @@ class _TRexPort(TrafficGeneratorPort):
             self.__traffic_flows = traffic_flows
             return True
         else:
-            raise ValueError("Unsupported traffic flow passed for T-Rex tester!")
+            raise ValueError(
+                "Unsupported traffic flow passed for T-Rex tester!")
 
         self.__traffic_flows = TrafficFlowType.none
         return False
@@ -412,6 +417,7 @@ class _TRexPort(TrafficGeneratorPort):
         return {TrafficFlowType.nfv_mobile: {
             "MAX_L2_MACS": 1000000,
             "MAX_FLOWS": 0xFFFFFF}}
+
 
 #
 # TRex chassis class
@@ -527,10 +533,8 @@ class TRex(TrafficGeneratorChassis):
     def configure_traffic_stream(self, port_name, traffic_flows,
                                  nr_of_flows, packet_size, **kwargs):
         if self._verify_port_action(port_name):
-            return self.port_data[port_name].configure_traffic_stream(traffic_flows,
-                                                                      nr_of_flows,
-                                                                      packet_size,
-                                                                      **kwargs)
+            return self.port_data[port_name].configure_traffic_stream(
+                traffic_flows, nr_of_flows, packet_size, **kwargs)
         return False
 
     def next_traffic_stream(self, port_name):
