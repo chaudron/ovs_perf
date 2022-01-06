@@ -216,11 +216,9 @@ class _TRexPort(TrafficGeneratorPort):
             elif traffic_flows == TrafficFlowType.l3_ipv4:
 
                 src_end = str(netaddr.IPAddress(
-                    int(netaddr.IPAddress('1.0.0.0')) +
-                    nr_of_flows - 1))
+                    int(netaddr.IPAddress('1.0.0.0')) + nr_of_flows - 1))
                 dst_end = str(netaddr.IPAddress(
-                    int(netaddr.IPAddress('2.0.0.0')) +
-                    nr_of_flows - 1))
+                    int(netaddr.IPAddress('2.0.0.0')) + nr_of_flows - 1))
 
                 vm = [
                     # Source IPv4 address
@@ -239,11 +237,9 @@ class _TRexPort(TrafficGeneratorPort):
             elif traffic_flows == TrafficFlowType.nfv_mobile:
 
                 src_end = str(netaddr.IPAddress(
-                    int(netaddr.IPAddress('1.0.0.0')) +
-                    nr_of_flows - 1))
+                    int(netaddr.IPAddress('1.0.0.0')) + nr_of_flows - 1))
                 dst_end = str(netaddr.IPAddress(
-                    int(netaddr.IPAddress('2.0.0.0')) +
-                    nr_of_flows - 1))
+                    int(netaddr.IPAddress('2.0.0.0')) + nr_of_flows - 1))
 
                 vm = [
                     # Source MAC address
@@ -321,19 +317,15 @@ class _TRexPort(TrafficGeneratorPort):
                     flow_start = start_stream_id * 0x10000
 
                     src_start = str(netaddr.IPAddress(
-                        int(netaddr.IPAddress('1.0.0.0')) +
-                        flow_start))
+                        int(netaddr.IPAddress('1.0.0.0')) + flow_start))
                     src_end = str(netaddr.IPAddress(
-                        int(netaddr.IPAddress('1.0.0.0')) +
-                        flow_start +
-                        alternate_flows - 1))
+                        int(netaddr.IPAddress('1.0.0.0')) + flow_start
+                        + alternate_flows - 1))
                     dst_start = str(netaddr.IPAddress(
-                        int(netaddr.IPAddress('2.0.0.0')) +
-                        flow_start))
+                        int(netaddr.IPAddress('2.0.0.0')) + flow_start))
                     dst_end = str(netaddr.IPAddress(
-                        int(netaddr.IPAddress('2.0.0.0')) +
-                        flow_start +
-                        alternate_flows - 1))
+                        int(netaddr.IPAddress('2.0.0.0')) + flow_start
+                        + alternate_flows - 1))
 
                     vm = [
                         # Source MAC address

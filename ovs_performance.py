@@ -411,8 +411,8 @@ def test_p2v2p_single_packet_size(nr_of_flows, packet_size, **kwargs):
         # warm_up_time is the total time it takes from the start of the
         # VM at warm-up till we would normally start the loop back VM.
         # This values is used to remove warm-up statistics.
-        warm_up_time = int(np.ceil((datetime.datetime.now() -
-                                    start_vm_time).total_seconds()))
+        warm_up_time = int(np.ceil((datetime.datetime.now()
+                                    - start_vm_time).total_seconds()))
         lprint("  * Determine warm op time, {} seconds...".
                format(warm_up_time))
 
@@ -528,8 +528,8 @@ def test_p2v2p(nr_of_flows, packet_sizes):
 
     for packet_size in packet_sizes:
         results = test_p2v2p_single_packet_size(nr_of_flows, packet_size,
-                                                decrease_rate=100 -
-                                                config.traffic_rate)
+                                                decrease_rate=100
+                                                - config.traffic_rate)
 
         cpu_results.append(results["cpu_stats"])
         p2v2p_results.append(results["rx_packets_second"])
@@ -986,8 +986,8 @@ def test_p(nr_of_flows, packet_sizes):
 
     for packet_size in packet_sizes:
         results = test_p_single_packet_size(nr_of_flows, packet_size,
-                                            decrease_rate=100 -
-                                            config.traffic_rate)
+                                            decrease_rate=100
+                                            - config.traffic_rate)
 
         cpu_results.append(results["cpu_stats"])
         p_results.append(results["rx_packets_second"])
@@ -2695,8 +2695,8 @@ def create_single_graph(x, y, x_label, y_label, title,
             handler_y_values.append(cpu_util[i]['ovs_cpu_handler'])
             urcu_y_values.append(cpu_util[i]['ovs_cpu_urcu'])
             other_y_values.append(cpu_util[i]['ovs_cpu_other'])
-            usr_y_values.append(cpu_util[i]['sys_usr'] -
-                                cpu_util[i]['ovs_cpu'])
+            usr_y_values.append(cpu_util[i]['sys_usr']
+                                - cpu_util[i]['ovs_cpu'])
             nice_y_values.append(cpu_util[i]['sys_nice'])
             sys_y_values.append(cpu_util[i]['sys_sys'])
             iowait_y_values.append(cpu_util[i]['sys_iowait'])
@@ -3387,9 +3387,9 @@ def get_cpu_monitoring_stats():
         cpu_gnice += float(match.group(9))
         cpu_idle += float(match.group(10))
 
-    cpu_total = int(cpu_usr + cpu_nice + cpu_sys + cpu_iowait +
-                    cpu_irq + cpu_soft + cpu_steal + cpu_guest +
-                    cpu_gnice + cpu_idle)
+    cpu_total = int(cpu_usr + cpu_nice + cpu_sys + cpu_iowait
+                    + cpu_irq + cpu_soft + cpu_steal + cpu_guest
+                    + cpu_gnice + cpu_idle)
 
     ovs_cpu_total = ovs_cpu_pmd + ovs_cpu_revalidator + ovs_cpu_handler + \
         ovs_cpu_urcu + ovs_cpu_other

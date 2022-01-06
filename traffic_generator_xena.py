@@ -139,8 +139,8 @@ class _XenaNetworksPort(TrafficGeneratorPort):
             L2 = Ether(src=src_mac, dst=dst_mac)
             L3 = IP(src="1.0.0.0", dst="2.0.0.0")
             L4 = UDP(chksum=0)
-        elif (traffic_flows == TrafficFlowType.l3_ipv4 or
-              traffic_flows == TrafficFlowType.nfv_mobile):
+        elif (traffic_flows == TrafficFlowType.l3_ipv4
+              or traffic_flows == TrafficFlowType.nfv_mobile):
             L2 = Ether(src=traffic_src_mac, dst=traffic_dst_mac)
             L3 = IP(src="1.{}.0.0".format(offset),
                     dst="2.{}.0.0".format(offset))
@@ -213,8 +213,8 @@ class _XenaNetworksPort(TrafficGeneratorPort):
             m2_new_stream.set_modifier(10, 0xffff0000, 'inc', 1)
             m2_new_stream.set_modifier_range(0, 1, nr_of_flows - 1)
 
-        elif (traffic_flows == TrafficFlowType.l3_ipv4 or
-              traffic_flows == TrafficFlowType.nfv_mobile):
+        elif (traffic_flows == TrafficFlowType.l3_ipv4
+              or traffic_flows == TrafficFlowType.nfv_mobile):
             m1_new_stream = new_stream.add_modifier()
             if m1_new_stream is None:
                 self.__xport.del_stream(stream_id)
@@ -348,8 +348,8 @@ class _XenaNetworksPort(TrafficGeneratorPort):
                     flows_this_run = flows_to_do
                 flows_to_do -= flows_this_run
 
-                stream_percentage = ((flow_percentage * flows_this_run) /
-                                     nr_of_flows)
+                stream_percentage = (flow_percentage * flows_this_run
+                                     / nr_of_flows)
                 if not self._configure_xena_stream(stream, traffic_flows,
                                                    stream - 1, flows_this_run,
                                                    packet_size,
@@ -375,26 +375,26 @@ class _XenaNetworksPort(TrafficGeneratorPort):
                     stream_id_start = len(self.__streams) + 1
                     self.__alternate_stream_sets.append(
                         list(range(stream_id_start,
-                                   stream_id_start +
-                                   self._div_round_up(alternate_flows,
-                                                      0x10000))))
+                                   stream_id_start
+                                   + self._div_round_up(alternate_flows,
+                                                        0x10000))))
                     if alternate_flow_sets == 0:
                         suppress = False
                     else:
                         suppress = True
 
                     for stream in range(stream_id_start,
-                                        stream_id_start +
-                                        self._div_round_up(alternate_flows,
-                                                           0x10000)):
+                                        stream_id_start
+                                        + self._div_round_up(alternate_flows,
+                                                             0x10000)):
                         if flows_to_do > 0x10000:
                             flows_this_run = 0x10000
                         else:
                             flows_this_run = flows_to_do
 
                         flows_to_do -= flows_this_run
-                        stream_percentage = (alternate_flow_percentage *
-                                             flows_this_run) / alternate_flows
+                        stream_percentage = alternate_flow_percentage \
+                            * flows_this_run / alternate_flows
 
                         if not self._configure_xena_stream(
                                 stream,
