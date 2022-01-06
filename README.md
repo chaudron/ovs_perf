@@ -239,7 +239,7 @@ We need to install a bunch of Python libraries we need for the PVP script.
 We will use pip to do this:
 
 ```
-pip install --upgrade enum34 natsort netaddr matplotlib scapy spur
+pip install --upgrade enum34 natsort netaddr matplotlib packaging scapy spur
 ```
 
 

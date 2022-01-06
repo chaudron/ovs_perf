@@ -40,6 +40,8 @@
 #        pip install scapy
 #    - Install netaddr
 #        pip install netaddr
+#    - Install packaging (python3)
+#        pip install packaging
 #
 #  Example:
 #
@@ -63,9 +65,9 @@ import argparse
 import csv
 import datetime
 import inspect
-import os
 import logging
 import numpy as np
+import os
 import re
 import spur
 import sys
@@ -88,9 +90,13 @@ from traffic_generator import TrafficGenerator, TrafficGeneratorType
 from natsort import natsorted
 
 #
-# Imports from distutils
+# Imports from packaging or distutils
 #
-from distutils.version import StrictVersion
+if sys.version_info[0] == 2:
+    from distutils.version import StrictVersion as Version
+else:
+    from packaging.version import Version
+
 
 #
 # Imports from Matplot, by default disable the tk interface
@@ -1510,11 +1516,11 @@ def start_traffic_rx_on_vm(vm, pci):
     cpu_mask = ((1 << (config.dut_vm_nic_queues + 1)) - 1)
     pmd_cpu_mask = cpu_mask & ~0x1
     disable_hw_vlan = " --disable-hw-vlan" if vm_dpdk_version < \
-                      StrictVersion('18.2.0') else ""
+                      Version('18.2.0') else ""
     legacy_mem = " --legacy-mem" if vm_dpdk_version >= \
-                 StrictVersion('18.5.0') else ""
+                 Version('18.5.0') else ""
     auto_delay = DELAY_TEST_PMD if config.testpmd_startup_delay == 0 else ""
-    pci_flag = "-w" if vm_dpdk_version < StrictVersion('20.11.0') else "-a"
+    pci_flag = "-w" if vm_dpdk_version < Version('20.11.0') else "-a"
 
     cmd = r"sshpass -p {2} ssh -o UserKnownHostsFile=/dev/null " \
           r"-o StrictHostKeyChecking=no -n {1}@{0} " \
@@ -1559,11 +1565,11 @@ def start_traffic_loop_on_vm(vm, pci):
     pmd_cpu_mask = cpu_mask & ~0x1
     mac_swap = " --forward-mode=macswap" if config.mac_swap else ""
     disable_hw_vlan = " --disable-hw-vlan" if vm_dpdk_version < \
-                      StrictVersion('18.2.0') else ""
+                      Version('18.2.0') else ""
     legacy_mem = " --legacy-mem" if vm_dpdk_version >= \
-                 StrictVersion('18.5.0') else ""
+                 Version('18.5.0') else ""
     auto_delay = DELAY_TEST_PMD if config.testpmd_startup_delay == 0 else ""
-    pci_flag = "-w" if vm_dpdk_version < StrictVersion('20.11.0') else "-a"
+    pci_flag = "-w" if vm_dpdk_version < Version('20.11.0') else "-a"
 
     cmd = r"sshpass -p {2} ssh -o UserKnownHostsFile=/dev/null " \
           r"-o StrictHostKeyChecking=no -n {1}@{0} " \
@@ -2294,7 +2300,7 @@ def create_ovs_bridge():
     # addresses for the physical ports.
     #
 
-    if dpdk and StrictVersion(ovs_version) >= StrictVersion('2.7.0'):
+    if dpdk and ovs_version >= Version('2.7.0'):
         if not check_pci_address_string(config.physical_interface_pci) or \
            (config.run_pp_test and not
            check_pci_address_string(config.second_physical_interface_pci)):
@@ -2396,7 +2402,7 @@ def create_ovs_vxlan_bridge():
     # addresses for the physical ports.
     #
 
-    if dpdk and StrictVersion(ovs_version) >= StrictVersion('2.7.0'):
+    if dpdk and ovs_version >= Version('2.7.0'):
         if not check_pci_address_string(config.physical_interface_pci) or \
            (config.run_pp_test and not
            check_pci_address_string(config.second_physical_interface_pci)):
@@ -3426,7 +3432,7 @@ def get_ovs_version():
     m = re.search('.*([0-9]+.[0-9]+.[0-9]+).*',
                   str(result.output))
     if m:
-        return str(m.group(1))
+        return Version(str(m.group(1)))
 
     lprint("ERROR: Can't figure out ovs-vswitchd's version!")
     sys.exit(-1)
@@ -3467,7 +3473,7 @@ def get_vm_dpdk_version(vm):
     m = re.search('DPDK ([0-9]+\\.[0-9]+\\.[0-9]+)',
                   result.output)
     if m:
-        return str(m.group(1))
+        return Version(str(m.group(1)))
 
     lprint("ERROR: Can't figure out VMs DPDK version!")
     sys.exit(-1)
