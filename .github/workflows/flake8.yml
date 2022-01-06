@@ -24,4 +24,4 @@ jobs:
         pip install flake8
     - name: Analyzing the code with flake8
       run: |
-        flake8 `ls -R|grep .py$|xargs` --ignore=E501,W503,W504
+        flake8 `ls -R|grep .py$|xargs` --ignore=W503,W504
