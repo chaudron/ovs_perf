@@ -58,10 +58,6 @@ from xenalib.XenaManager import XenaManager
 # Imports from Scapy
 #
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
-
-#
-# Remove VXLAN for now, as Scapy needed for T-Rex has no VXLAN support.
-#
 from scapy.all import UDP, IP, Ether, VXLAN  # noqa: E402
 
 
