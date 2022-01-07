@@ -38,13 +38,13 @@ from enum import Enum
 # Type of traffic generator
 #
 class TrafficFlowType(Enum):
-    none          = 0
-    l2_mac        = 1
-    l3_ipv4       = 2
-    l4_udp        = 3
-    vxlan_l2_mac  = 4
+    none = 0
+    l2_mac = 1
+    l3_ipv4 = 2
+    l4_udp = 3
+    vxlan_l2_mac = 4
     vxlan_l3_ipv4 = 5
-    nfv_mobile    = 6
+    nfv_mobile = 6
 
 
 #
