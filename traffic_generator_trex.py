@@ -372,9 +372,6 @@ class _TRexPort(TrafficGeneratorPort):
 
             self.__traffic_flows = traffic_flows
             return True
-        elif traffic_flows == TrafficFlowType.none:
-            self.__traffic_flows = traffic_flows
-            return True
         elif traffic_flows == TrafficFlowType.vxlan_l3_ipv4:
             tunnel_src_mac = "00:00:00:00:00:01"
             tunnel_dst_mac = kwargs.pop("tunnel_dst_mac", None)
@@ -386,7 +383,7 @@ class _TRexPort(TrafficGeneratorPort):
             L5 = VXLAN(vni=69, NextProtocol=0, flags='Instance')
             L6 = Ether(src=trex_src_mac, dst=trex_dst_mac)
             L7 = IP(src="1.0.0.0", dst="2.0.0.0")
-            tmpl = L2 / L3 / L4 / L5 / L6 / L7
+            headers = L2 / L3 / L4 / L5 / L6 / L7
 
             if (len(tmpl) + 4) > packet_size:  # +4 for Ethernet CRC
                 raise ValueError("Packet size ({} bytes) too small for"
@@ -420,13 +417,11 @@ class _TRexPort(TrafficGeneratorPort):
 
                 # Checksum
                 STLVmFixIpv4(offset="IP:1"),
-
                 STLVmFixIpv4(offset="IP:0")
             ]
 
             stream_percentage = flow_percentage
 
-            headers = tmpl
             padding = max(0, (packet_size - len(headers))) * 'e'
             packet = headers / padding
 
@@ -438,6 +433,9 @@ class _TRexPort(TrafficGeneratorPort):
             self.__trex_client.add_streams(trex_stream,
                                            ports=[self.__trex_port])
 
+            self.__traffic_flows = traffic_flows
+            return True
+        elif traffic_flows == TrafficFlowType.none:
             self.__traffic_flows = traffic_flows
             return True
         else:
