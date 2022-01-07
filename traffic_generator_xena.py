@@ -80,8 +80,8 @@ class _XenaNetworksPort(TrafficGeneratorPort):
 
     def _int_2_mac(self, mac_int):
         mac_hex = "{:012x}".format(mac_int)
-        return ":".join(mac_hex[i:i+2] for i in range(0, len(mac_hex), 2)) \
-            # noqa: E226
+        return ":".join(mac_hex[i:i + 2]
+                        for i in range(0, len(mac_hex), 2))
 
     def _mac_2_int(self, mac_str):
         return int(mac_str.replace(":", ""), 16)

@@ -60,7 +60,7 @@ from trex.stl.api import STLClient, STLError, STLPktBuilder, STLStream, \
 # Imports from Scapy
 #
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
-from scapy.all import UDP, IP, Ether  # noqa: E402
+from scapy.all import UDP, IP, Ether, VXLAN  # noqa: E402
 
 
 #
@@ -369,6 +369,68 @@ class _TRexPort(TrafficGeneratorPort):
 
                     start_stream_id += self._div_round_up(alternate_flows,
                                                           0x10000)
+
+            self.__traffic_flows = traffic_flows
+            return True
+        elif traffic_flows == TrafficFlowType.vxlan_l3_ipv4:
+            tunnel_src_mac = "00:00:00:00:00:01"
+            tunnel_dst_mac = kwargs.pop("tunnel_dst_mac", None)
+
+            L2 = Ether(src=tunnel_src_mac,
+                       dst=tunnel_dst_mac)
+            L3 = IP(src="3.1.1.2", dst="3.1.1.1")
+            L4 = UDP(sport=32768, dport=4789, chksum=0)
+            L5 = VXLAN(vni=69, NextProtocol=0, flags='Instance')
+            L6 = Ether(src=trex_src_mac, dst=trex_dst_mac)
+            L7 = IP(src="1.0.0.0", dst="2.0.0.0")
+            headers = L2 / L3 / L4 / L5 / L6 / L7
+
+            if (len(headers) + 4) > packet_size:  # +4 for Ethernet CRC
+                raise ValueError("Packet size ({} bytes) too small for"
+                                 "requested packet ({} bytes)!".
+                                 format(packet_size, len(headers) + 4))
+
+            src_end = str(netaddr.IPAddress(
+                int(netaddr.IPAddress('1.0.0.0')) + nr_of_flows - 1))
+            dst_end = str(netaddr.IPAddress(
+                int(netaddr.IPAddress('2.0.0.0')) + nr_of_flows - 1))
+            port_start = 49152
+            port_end = min(65535, port_start + nr_of_flows)
+
+            vm = [
+                # Source IPv4 address
+                STLVmFlowVar(name="in_src", min_value="1.0.0.0",
+                             max_value=src_end, size=4, op="inc"),
+                STLVmWrFlowVar(fv_name="in_src", pkt_offset="IP:1.src"),
+
+                # Destination IPv4 address
+                STLVmFlowVar(name="in_dst", min_value="2.0.0.0",
+                             max_value=dst_end, size=4, op="inc"),
+                STLVmWrFlowVar(fv_name="in_dst", pkt_offset="IP:1.dst"),
+
+                # Tunnel
+                STLVmFlowVar(name="t_i_src", min_value=port_start,
+                             max_value=port_end, size=2, op="inc"),
+                STLVmWrFlowVar(fv_name="t_i_src", pkt_offset="UDP:0.sport"),
+
+                # Checksum
+                STLVmFixIpv4(offset="IP:1"),
+                STLVmFixIpv4(offset="IP:0")
+            ]
+
+            stream_percentage = flow_percentage
+
+            padding = max(0, (packet_size - len(headers))) * 'e'
+            packet = headers / padding
+
+            trex_packet = STLPktBuilder(pkt=packet, vm=vm)
+
+            trex_stream = STLStream(packet=trex_packet,
+                                    mode=STLTXCont(
+                                        percentage=stream_percentage))
+
+            self.__trex_client.add_streams(trex_stream,
+                                           ports=[self.__trex_port])
 
             self.__traffic_flows = traffic_flows
             return True
