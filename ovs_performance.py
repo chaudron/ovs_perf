@@ -47,7 +47,7 @@
 #
 #
 # TODOs:
-#   - Add tunnel test cases (Geneve and VXLAN)
+#   - Add tunnel test cases (Geneve)
 #   - Add check after test to see all OF flows got packets (n_packets != 0)
 #   - Add option to stop trying more packet sizes once maximum performance
 #     of link is reached (i.e. two consecutive runs @ wire speed)
@@ -1231,17 +1231,8 @@ def test_p_zero_loss(stream_size_list, packet_size_list, **kwargs):
 #
 # Run VXLAN test
 #
-# TODO: This is only tested on OVS-DPDK, need modular support
-#       so it will work on kernel (hw offload) datapath.
-#
-#       Also needs encap test, and encap-decap test.
-#
-#       Also note that this test will not distribute the
-#       load among rx queue's as the outer IP+UDP headers
-#       do not change. Making the source UDP port of the
-#       outer header will solve this, but we have no more
-#       modifiers. We could do a destination IP only OF
-#       rule and use the source IP counters for src UDP.
+# - This is only tested on OVS-DPDK, need modular support
+#   so it will work on kernel (hw offload) datapath.
 #
 def test_vxlan(nr_of_flows, packet_sizes, pvp_test=False):
 
@@ -3794,10 +3785,11 @@ def main():
     parser.add_argument("--run-pvp-zero-loss-test",
                         help="Run the P to V to P test with zero packet loss",
                         action="store_true")
-    parser.add_argument("--run-vxlan-test",
-                        help="Run the VXLAN tunnel test", action="store_true")
-    parser.add_argument("--vxlan-test-is-pvp",
-                        help="Run the VXLAN tunnel test as a PVP test",
+    parser.add_argument("--run-vxlan-pv-test",
+                        help="Run the VXLAN pv tunnel test",
+                        action="store_true")
+    parser.add_argument("--run-vxlan-pvp-test",
+                        help="Run the VXLAN pvp tunnel test",
                         action="store_true")
     parser.add_argument("--skip-pv-test",
                         help="Do not run the P to V test", action="store_true")
@@ -4017,7 +4009,8 @@ def main():
         lprint("ERROR: Invalid VM NIC queue count supplied [1..63]!")
         sys.exit(-1)
 
-    if config.run_vxlan_test and config.no_bridge_config:
+    if (config.run_vxlan_pv_test or config.run_vxlan_pvp_test) \
+            and config.no_bridge_config:
         #
         # We can only support tunnels with no bridge config, if no other tests
         # are ran, as it needs a special config compared to the other tests.
@@ -4030,11 +4023,13 @@ def main():
                    "with the no-bridge-config option!")
             sys.exit(-1)
 
-    if config.run_vxlan_test and config.flow_type != 'L3':
+    if (config.run_vxlan_pv_test or config.run_vxlan_pvp_test) \
+            and config.flow_type != 'L3':
         lprint("ERROR: Tunnel tests only support the L3 flow type!")
         sys.exit(-1)
 
-    if config.run_vxlan_test and not check_list(config.packet_list, 96, 9000):
+    if (config.run_vxlan_pv_test or config.run_vxlan_pvp_test) \
+            and not check_list(config.packet_list, 96, 9000):
         #
         # ETH + IPv4 + UDP + VXLAN + ETH + IPv4 + UDP + ETH_CRC
         #
@@ -4042,7 +4037,9 @@ def main():
                "bytes!")
         sys.exit(-1)
 
-    if config.warm_up and (not config.skip_vv_test or config.run_vxlan_test):
+    if config.warm_up and (not config.skip_vv_test
+                           or config.run_vxlan_pv_test
+                           or config.run_vxlan_pvp_test):
         lprint("WARNING: Warm-up only works for P2P, P2V, and P2V2P tests!")
 
     if config.warm_up and config.flow_rule_type != "flows" and \
@@ -4240,7 +4237,8 @@ def main():
     #
     # Create OVS bridge, and get OpenFlow port numbers
     #
-    if not config.no_bridge_config and not config.run_vxlan_test:
+    if not config.no_bridge_config and not \
+            (config.run_vxlan_pv_test or config.run_vxlan_pvp_test):
         if not config.skip_pv_test or not config.skip_pvp_test or \
            not config.skip_vv_test or config.run_pp_test or \
            config.run_pvp_zero_loss_test or config.run_p_test or \
@@ -4458,7 +4456,7 @@ def main():
                                    stream_size_list, packet_size_list,
                                    p_results, p_cpu_results)
 
-        if config.run_vxlan_test:
+        if config.run_vxlan_pv_test or config.run_vxlan_pvp_test:
             if not config.no_bridge_config:
                 create_ovs_vxlan_bridge()
 
@@ -4470,33 +4468,46 @@ def main():
             vxlan_results = dict()
             vxlan_cpu_results = dict()
 
-            for nr_of_streams in stream_size_list:
-                vxlan_results[nr_of_streams], \
-                    vxlan_cpu_results[nr_of_streams] = test_vxlan(
-                        nr_of_streams,
-                        packet_size_list,
-                        config.vxlan_test_is_pvp)
+            test_types = []
+            if config.run_vxlan_pv_test:
+                test_types.append("PV")
+            if config.run_vxlan_pvp_test:
+                test_types.append("PVP")
 
-                create_multiple_graph(packet_size_list, vxlan_results,
-                                      "Packet size", "Packets/second",
-                                      "VXLAN Tunnel, {}{}".
-                                      format(flow_str, get_traffic_rate_str()),
-                                      "test_vxlan_all_{}".format(
-                                          flow_file_str),
-                                      None, cpu_utilization=vxlan_cpu_results)
+            for test_type in test_types:
+                for nr_of_streams in stream_size_list:
+                    vxlan_results[nr_of_streams], \
+                        vxlan_cpu_results[nr_of_streams] = test_vxlan(
+                            nr_of_streams,
+                            packet_size_list,
+                            pvp_test=test_type == "PVP")
 
-                create_multiple_graph(packet_size_list, vxlan_results,
-                                      "Packet size", "Packets/second",
-                                      "VXLAN Tunnel, {}{}".
-                                      format(flow_str, get_traffic_rate_str()),
-                                      "test_vxlan_all_{}_ref".format(
-                                          flow_file_str),
-                                      [phy_speed],
-                                      cpu_utilization=vxlan_cpu_results)
+                    create_multiple_graph(packet_size_list, vxlan_results,
+                                          "Packet size", "Packets/second",
+                                          "VXLAN {} Tunnel, {}{}".
+                                          format(test_type, flow_str,
+                                                 get_traffic_rate_str()),
+                                          "test_vxlan_{}_all_{}".format(
+                                              test_type,
+                                              flow_file_str),
+                                          None,
+                                          cpu_utilization=vxlan_cpu_results)
 
-            csv_write_test_results(csv_handle, 'VXLAN Tunnel',
-                                   stream_size_list, packet_size_list,
-                                   vxlan_results, vxlan_cpu_results)
+                    create_multiple_graph(packet_size_list, vxlan_results,
+                                          "Packet size", "Packets/second",
+                                          "VXLAN {} Tunnel, {}{}".
+                                          format(test_type, flow_str,
+                                                 get_traffic_rate_str()),
+                                          "test_vxlan_{}_all_{}_ref".format(
+                                              test_type,
+                                              flow_file_str),
+                                          [phy_speed],
+                                          cpu_utilization=vxlan_cpu_results)
+
+                csv_write_test_results(csv_handle,
+                                       'VXLAN {} Tunnel'.format(test_type),
+                                       stream_size_list, packet_size_list,
+                                       vxlan_results, vxlan_cpu_results)
 
         #
         # Run the zero packet loss test

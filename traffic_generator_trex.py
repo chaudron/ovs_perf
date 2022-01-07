@@ -394,8 +394,8 @@ class _TRexPort(TrafficGeneratorPort):
                 int(netaddr.IPAddress('1.0.0.0')) + nr_of_flows - 1))
             dst_end = str(netaddr.IPAddress(
                 int(netaddr.IPAddress('2.0.0.0')) + nr_of_flows - 1))
-            port_start = 32768
-            port_end = 32800
+            port_start = 49152
+            port_end = min(65535, port_start + nr_of_flows)
 
             vm = [
                 # Source IPv4 address
