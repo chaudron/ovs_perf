@@ -36,6 +36,7 @@ traffic flows.
     * [Add the packages we need](#Add-the-packages-we-need)
     * [Tweak the system for OVS-DPDK and Qemu usage](#Tweak-the-system-for-OVS-DPDK-and-Qemu-usage)
     * [Setup Open vSwitch](#Setup-Open-vSwitch)
+    * [Bridge Configuration for VXLAN Test Under DPDK](#Bridge Configuration for VXLAN Test Under DPDK)
     * [Create the loopback Virtual Machine](#Create-the-loopback-Virtual-Machine)
   * [Running the PVP script](#Running-the-PVP-script)
   * [Analyzing the results](#Analyzing-the-results)
@@ -554,6 +555,36 @@ ovs-vsctl add-port ovs_pvp_br0 vhost0 -- \
           set Interface vhost0 ofport_request=2
 ```
 
+
+
+### Bridge Configuration for VXLAN Test Under DPDK
+If running a VXLAN test, a slightly different bridge configuration is required:
+
+```
+ovs-vsctl -- --if-exists del-br ovs_pvp_br0 -- --if-exists del-br ovs_pvp_br0_tte
+
+ovs-vsctl add-br ovs_pvp_br0 -- add-br ovs_pvp_br0_tte
+
+ovs-vsctl set Bridge ovs_pvp_br0 datapath_type=netdev -- set Bridge ovs_pvp_br0_tte datapath_type=netdev
+
+ovs-vsctl add-port ovs_pvp_br0_tte dpdk0 -- \
+    set Interface dpdk0 ofport_request=10 -- \
+    set Interface dpdk0 type=dpdk -- \
+    set interface dpdk0 options:n_rxq=2 other_config:pmd-rxq-affinity="0:1,1:15" -- \
+    set Interface dpdk0 options:dpdk-devargs=0000:01:00.0
+
+ovs-vsctl add-port ovs_pvp_br0 vhost0 -- \
+    set Interface vhost0 options:vhost-server-path="/tmp/vhost-sock0" -- \
+    set Interface vhost0 type=dpdkvhostuserclient -- \
+    set interface vhost0 options:n_rxq=2 other_config:pmd-rxq-affinity="0:1,1:15" -- \
+    set Interface vhost0 ofport_request=20
+
+ovs-vsctl set Interface vhost0 ofport_request=20 -- \
+    add-port ovs_pvp_br0 vxlan0 -- \
+    set Interface vxlan0 ofport_request=30 -- \
+    set interface vxlan0 options:n_rxq=2 other_config:pmd-rxq-affinity="0:1,1:15" -- \
+    set interface vxlan0 type=vxlan options:remote_ip=3.1.1.2 options:key=69
+```
 
 
 
