@@ -36,7 +36,7 @@ traffic flows.
     * [Add the packages we need](#Add-the-packages-we-need)
     * [Tweak the system for OVS-DPDK and Qemu usage](#Tweak-the-system-for-OVS-DPDK-and-Qemu-usage)
     * [Setup Open vSwitch](#Setup-Open-vSwitch)
-    * [Bridge Configuration for VXLAN Test Under DPDK](#Bridge Configuration for VXLAN Test Under DPDK)
+    * [Bridge Configuration for VXLAN Test Under DPDK](#Bridge-Configuration-for-VXLAN-Test-Under-DPDK)
     * [Create the loopback Virtual Machine](#Create-the-loopback-Virtual-Machine)
   * [Running the PVP script](#Running-the-PVP-script)
   * [Analyzing the results](#Analyzing-the-results)
