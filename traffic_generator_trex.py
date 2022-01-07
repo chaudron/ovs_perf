@@ -385,17 +385,15 @@ class _TRexPort(TrafficGeneratorPort):
             L7 = IP(src="1.0.0.0", dst="2.0.0.0")
             headers = L2 / L3 / L4 / L5 / L6 / L7
 
-            if (len(tmpl) + 4) > packet_size:  # +4 for Ethernet CRC
+            if (len(headers) + 4) > packet_size:  # +4 for Ethernet CRC
                 raise ValueError("Packet size ({} bytes) too small for"
                                  "requested packet ({} bytes)!".
-                                 format(packet_size, len(tmpl) + 4))
+                                 format(packet_size, len(headers) + 4))
 
             src_end = str(netaddr.IPAddress(
-                int(netaddr.IPAddress('1.0.0.0')) +
-                nr_of_flows - 1))
+                int(netaddr.IPAddress('1.0.0.0')) + nr_of_flows - 1))
             dst_end = str(netaddr.IPAddress(
-                int(netaddr.IPAddress('2.0.0.0')) +
-                nr_of_flows - 1))
+                int(netaddr.IPAddress('2.0.0.0')) + nr_of_flows - 1))
             port_start = 32768
             port_end = 32800
 
@@ -428,7 +426,8 @@ class _TRexPort(TrafficGeneratorPort):
             trex_packet = STLPktBuilder(pkt=packet, vm=vm)
 
             trex_stream = STLStream(packet=trex_packet,
-                                    mode=STLTXCont(percentage=stream_percentage))
+                                    mode=STLTXCont(
+                                        percentage=stream_percentage))
 
             self.__trex_client.add_streams(trex_stream,
                                            ports=[self.__trex_port])

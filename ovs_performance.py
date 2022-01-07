@@ -101,20 +101,9 @@ else:
 #
 # Imports from Matplot, by default disable the tk interface
 #
-import matplotlib
+import matplotlib  # noqa: E402
 matplotlib.use('Agg')
 
-#
-# Imports from Matplot, by default disable the tk interface
-#
-import matplotlib
-matplotlib.use('Agg')
-
-#
-# Imports from Matplot, by default disable the tk interface
-#
-import matplotlib
-matplotlib.use('Agg')
 
 # In Python 2, raw_input() returns a string, and input() tries
 # to run the input as a Python expression.
@@ -1269,7 +1258,8 @@ def test_vxlan(nr_of_flows, packet_sizes, pvp_test=False):
     if pvp_test is True:
         create_ovs_bidirectional_of_rules(nr_of_flows,
                                           of_interfaces['vxlan0'],
-                                          of_interfaces[config.virtual_interface])
+                                          of_interfaces[
+                                              config.virtual_interface])
     else:
         create_ovs_of_rules(nr_of_flows,
                             of_interfaces['vxlan0'],
@@ -1322,17 +1312,22 @@ def test_vxlan(nr_of_flows, packet_sizes, pvp_test=False):
 
         if pvp_test is True:
             pp_tx_start, pp_tx_drop_start, pp_rx_start, pp_rx_drop_start \
-                = get_of_port_packet_stats(of_interfaces[config.physical_interface], bridge=tunnel_bridge)
+                = get_of_port_packet_stats(
+                    of_interfaces[config.physical_interface],
+                    bridge=tunnel_bridge)
 
             vp_tx_start, vp_tx_drop_start, vp_rx_start, vp_rx_drop_start \
-                = get_of_port_packet_stats(of_interfaces[config.virtual_interface])
+                = get_of_port_packet_stats(
+                    of_interfaces[config.virtual_interface])
         else:
             pp_rx_start \
-                = get_of_port_packet_stats(of_interfaces[config.physical_interface],
-                                           bridge=tunnel_bridge)[2]
+                = get_of_port_packet_stats(
+                    of_interfaces[config.physical_interface],
+                    bridge=tunnel_bridge)[2]
 
             vp_tx_start, vp_tx_drop_start \
-                = get_of_port_packet_stats(of_interfaces[config.virtual_interface])[0:2]
+                = get_of_port_packet_stats(
+                    of_interfaces[config.virtual_interface])[0:2]
 
         ##################################################
         lprint("  * Start packet receiver on VM...")
@@ -1381,11 +1376,13 @@ def test_vxlan(nr_of_flows, packet_sizes, pvp_test=False):
         slogger.debug(" full_tx_stats={}".format(full_tx_stats))
 
         if pvp_test is True:
-            full_rx_stats = tester.get_rx_statistics_snapshots(config.tester_interface)
+            full_rx_stats = tester.get_rx_statistics_snapshots(
+                config.tester_interface)
             slogger.debug(" full_rx_stats={}".format(full_rx_stats))
 
-        pp_rx_end = get_of_port_packet_stats(of_interfaces[config.physical_interface],
-                                             bridge=tunnel_bridge)[2]
+        pp_rx_end = get_of_port_packet_stats(
+            of_interfaces[config.physical_interface],
+            bridge=tunnel_bridge)[2]
 
         vp_tx_end, vp_tx_drop_end = get_of_port_packet_stats(
             of_interfaces[config.virtual_interface])[0:2]
@@ -2681,7 +2678,8 @@ def create_single_graph(x, y, x_label, y_label, title,
     pps_plot.autoscale(enable=True, axis='both', tight=False)
     pps_plot.plot(x, y, 'o-', label='average')
     pps_plot.ticklabel_format(axis='y', style='plain')
-    pps_plot.grid(visible=True, which='minor', color='k', linestyle=':', alpha=0.2)
+    pps_plot.grid(visible=True, which='minor',
+                  color='k', linestyle=':', alpha=0.2)
     pps_plot.minorticks_on()
 
     #
@@ -2934,7 +2932,8 @@ def create_multiple_graph(x, y, x_label, y_label,
     pps_plot.grid(True)
     pps_plot.autoscale(enable=True, axis='both', tight=False)
     pps_plot.ticklabel_format(axis='y', style='plain')
-    pps_plot.grid(visible=True, which='minor', color='k', linestyle=':', alpha=0.2)
+    pps_plot.grid(visible=True, which='minor',
+                  color='k', linestyle=':', alpha=0.2)
     pps_plot.minorticks_on()
 
     for y_run in natsorted(list(y.keys())):
@@ -3798,7 +3797,8 @@ def main():
     parser.add_argument("--run-vxlan-test",
                         help="Run the VXLAN tunnel test", action="store_true")
     parser.add_argument("--vxlan-test-is-pvp",
-                        help="Run the VXLAN tunnel test as a PVP test", action="store_true")
+                        help="Run the VXLAN tunnel test as a PVP test",
+                        action="store_true")
     parser.add_argument("--skip-pv-test",
                         help="Do not run the P to V test", action="store_true")
     parser.add_argument("--skip-pvp-test",
@@ -4472,9 +4472,10 @@ def main():
 
             for nr_of_streams in stream_size_list:
                 vxlan_results[nr_of_streams], \
-                    vxlan_cpu_results[nr_of_streams] = test_vxlan(nr_of_streams,
-                                                                  packet_size_list,
-                                                                  config.vxlan_test_is_pvp)
+                    vxlan_cpu_results[nr_of_streams] = test_vxlan(
+                        nr_of_streams,
+                        packet_size_list,
+                        config.vxlan_test_is_pvp)
 
                 create_multiple_graph(packet_size_list, vxlan_results,
                                       "Packet size", "Packets/second",
