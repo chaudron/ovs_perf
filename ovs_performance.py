@@ -40,13 +40,15 @@
 #        pip install scapy
 #    - Install netaddr
 #        pip install netaddr
+#    - Install packaging (python3)
+#        pip install packaging
 #
 #  Example:
 #
 #
 # TODOs:
 #   - Add tunnel test cases (Geneve and VXLAN)
-#   - Add check after test to see all OF flows got packets (i.e. n_packets != 0)
+#   - Add check after test to see all OF flows got packets (n_packets != 0)
 #   - Add option to stop trying more packet sizes once maximum performance
 #     of link is reached (i.e. two consecutive runs @ wire speed)
 #   - Add option to maximize traffic rate (PPS, and/or % based on port speed)
@@ -63,9 +65,9 @@ import argparse
 import csv
 import datetime
 import inspect
-import os
 import logging
 import numpy as np
+import os
 import re
 import spur
 import sys
@@ -88,9 +90,19 @@ from traffic_generator import TrafficGenerator, TrafficGeneratorType
 from natsort import natsorted
 
 #
-# Imports from distutils
+# Imports from packaging or distutils
 #
-from distutils.version import StrictVersion
+if sys.version_info[0] == 2:
+    from distutils.version import StrictVersion as Version
+else:
+    from packaging.version import Version
+
+
+#
+# Imports from Matplot, by default disable the tk interface
+#
+import matplotlib
+matplotlib.use('Agg')
 
 #
 # Imports from Matplot, by default disable the tk interface
@@ -111,29 +123,29 @@ if sys.version_info[0] == 3:
 #
 # Default configuration
 #
-DEFAULT_TESTER_TYPE               = 'xena'
-DEFAULT_TESTER_SERVER_ADDRESS     = ''
-DEFAULT_TESTER_INTERFACE          = ''
-DEFAULT_SECOND_TESTER_INTERFACE   = ''
-DEFAULT_DUT_ADDRESS               = ''
-DEFAULT_DUT_LOGIN_USER            = 'root'
-DEFAULT_DUT_LOGIN_PASSWORD        = 'root'
-DEFAULT_DUT_VM_ADDRESS            = ''
-DEFAULT_DUT_SECOND_VM_ADDRESS     = ''
-DEFAULT_DUT_VM_NIC_PCI_ADDRESS    = ''
-DEFAULT_DUT_VM_LOGIN_USER         = 'root'
-DEFAULT_DUT_VM_LOGIN_PASSWORD     = 'root'
-DEFAULT_PHYSICAL_INTERFACE        = ''
+DEFAULT_TESTER_TYPE = 'xena'
+DEFAULT_TESTER_SERVER_ADDRESS = ''
+DEFAULT_TESTER_INTERFACE = ''
+DEFAULT_SECOND_TESTER_INTERFACE = ''
+DEFAULT_DUT_ADDRESS = ''
+DEFAULT_DUT_LOGIN_USER = 'root'
+DEFAULT_DUT_LOGIN_PASSWORD = 'root'
+DEFAULT_DUT_VM_ADDRESS = ''
+DEFAULT_DUT_SECOND_VM_ADDRESS = ''
+DEFAULT_DUT_VM_NIC_PCI_ADDRESS = ''
+DEFAULT_DUT_VM_LOGIN_USER = 'root'
+DEFAULT_DUT_VM_LOGIN_PASSWORD = 'root'
+DEFAULT_PHYSICAL_INTERFACE = ''
 DEFAULT_SECOND_PHYSICAL_INTERFACE = ''
-DEFAULT_PACKET_LIST               = '64, 128, 256, 512, 768, 1024, 1514'
-DEFAULT_VIRTUAL_INTERFACE         = ''
-DEFAULT_SECOND_VIRTUAL_INTERFACE  = ''
-DEFAULT_RUN_TIME                  = 20
-DEFAULT_STREAM_LIST               = '10, 1000, 10000, 100000, 1000000'
-DEFAULT_BRIDGE_NAME               = 'ovs_pvp_br0'
-DEFAULT_WARM_UP_TIMEOUT           = 360
-DEFAULT_DST_MAC_ADDRESS           = '00:00:02:00:00:00'
-DEFAULT_SRC_MAC_ADDRESS           = '00:00:01:00:00:00'
+DEFAULT_PACKET_LIST = '64, 128, 256, 512, 768, 1024, 1514'
+DEFAULT_VIRTUAL_INTERFACE = ''
+DEFAULT_SECOND_VIRTUAL_INTERFACE = ''
+DEFAULT_RUN_TIME = 20
+DEFAULT_STREAM_LIST = '10, 1000, 10000, 100000, 1000000'
+DEFAULT_BRIDGE_NAME = 'ovs_pvp_br0'
+DEFAULT_WARM_UP_TIMEOUT = 360
+DEFAULT_DST_MAC_ADDRESS = '00:00:02:00:00:00'
+DEFAULT_SRC_MAC_ADDRESS = '00:00:01:00:00:00'
 
 
 #
@@ -169,7 +181,8 @@ def test_v2v(nr_of_flows, packet_sizes):
         start_cpu_monitoring()
 
         ##################################################
-        lprint("  * Start packet generation for {0} seconds...".format(config.run_time))
+        lprint("  * Start packet generation for {0} seconds...".format(
+            config.run_time))
         start_traffic_tx_on_vm(config.dut_vm_address,
                                nr_of_flows, packet_size)
         time.sleep(config.run_time)
@@ -191,7 +204,8 @@ def test_v2v(nr_of_flows, packet_sizes):
 
         of_dump_port_to_logfile(config.bridge_name)
 
-        vm_pkts_sec = get_traffic_rx_stats_from_vm(config.dut_second_vm_address)
+        vm_pkts_sec = get_traffic_rx_stats_from_vm(
+            config.dut_second_vm_address)
         vm_tx_pkts_sec = get_traffic_tx_stats_from_vm(config.dut_vm_address)
 
         lprint("    - Transmit rate on VM: {:,} pps".format(vm_tx_pkts_sec))
@@ -203,7 +217,8 @@ def test_v2v(nr_of_flows, packet_sizes):
 
         ##################################################
         lprint("  * Restoring state for next test...")
-        # dut_shell.dut_exec('sh -c "ovs-ofctl del-flows {0} && ovs-appctl dpctl/del-flows"'.\
+        # dut_shell.dut_exec('sh -c "ovs-ofctl del-flows {0} && '
+        #                    'ovs-appctl dpctl/del-flows"'.\
         #                    format(config.bridge_name),
         #                    die_on_error=True)
 
@@ -218,16 +233,21 @@ def test_v2v(nr_of_flows, packet_sizes):
     create_multiple_graph(packet_sizes, {'Send Rate': v2v_tx_results,
                                          'Receive Rate': v2v_rx_results},
                           "Packet size", "Packets/second",
-                          "Virtual to Virtual with {} {} flows".format(nr_of_flows, flow_str),
-                          "test_v2v_{}_{}".format(nr_of_flows, flow_file_str), None,
+                          "Virtual to Virtual with {} {} flows".format(
+                              nr_of_flows, flow_str),
+                          "test_v2v_{}_{}".format(nr_of_flows, flow_file_str),
+                          None,
                           cpu_utilization={'Receive Rate': cpu_results})
 
     create_multiple_graph(packet_sizes, {'Send Rate': v2v_tx_results,
                                          'Receive Rate': v2v_rx_results},
                           "Packet size", "Packets/second",
-                          "Virtual to Virtual with {} {} flows".format(nr_of_flows, flow_str),
-                          "test_v2v_{}_{}_ref".format(nr_of_flows, flow_file_str),
-                          [phy_speed], cpu_utilization={'Receive Rate': cpu_results})
+                          "Virtual to Virtual with {} {} flows".format(
+                              nr_of_flows, flow_str),
+                          "test_v2v_{}_{}_ref".format(nr_of_flows,
+                                                      flow_file_str),
+                          [phy_speed], cpu_utilization={'Receive Rate':
+                                                        cpu_results})
 
     return v2v_rx_results, cpu_results
 
@@ -239,10 +259,8 @@ def calc_loss_percentage(results):
     value = 100 - (float(results["total_rx_pkts"])
                    / float(results["total_tx_pkts"])
                    * 100)
-    if value < 0:
-        value = 0
 
-    return value
+    return max(value, 0)
 
 
 #
@@ -366,7 +384,9 @@ def test_p2v2p_single_packet_size(nr_of_flows, packet_size, **kwargs):
                                     nr_of_flows, packet_size,
                                     traffic_dst_mac=config.dst_mac_address,
                                     traffic_src_mac=config.src_mac_address,
-                                    percentage=1000000 - decrease_rate)
+                                    percentage=1000000 - decrease_rate,
+                                    random_payload=config.payload_packet_random
+                                    )
 
     ##################################################
     if config.warm_up:
@@ -403,8 +423,8 @@ def test_p2v2p_single_packet_size(nr_of_flows, packet_size, **kwargs):
         # warm_up_time is the total time it takes from the start of the
         # VM at warm-up till we would normally start the loop back VM.
         # This values is used to remove warm-up statistics.
-        warm_up_time = int(np.ceil((datetime.datetime.now() -
-                                    start_vm_time).total_seconds()))
+        warm_up_time = int(np.ceil((datetime.datetime.now()
+                                    - start_vm_time).total_seconds()))
         lprint("  * Determine warm op time, {} seconds...".
                format(warm_up_time))
 
@@ -413,7 +433,8 @@ def test_p2v2p_single_packet_size(nr_of_flows, packet_size, **kwargs):
     start_cpu_monitoring()
 
     ##################################################
-    lprint("  * Start packet generation for {0} seconds...".format(config.run_time))
+    lprint("  * Start packet generation for {0} seconds...".format(
+        config.run_time))
     tester.start_traffic(config.tester_interface)
     for i in range(1, config.run_time):
         time.sleep(1)
@@ -460,36 +481,40 @@ def test_p2v2p_single_packet_size(nr_of_flows, packet_size, **kwargs):
     vm_pkts_sec = get_traffic_rx_stats_from_vm(config.dut_vm_address,
                                                skip_samples=warm_up_time)
 
-    packets_tx = full_tx_stats[sorted(full_tx_stats.keys())[-1]]['pt_total']['packets']
-    packets_rx = full_rx_stats[sorted(full_rx_stats.keys())[-1]]['pr_total']['packets']
+    packets_tx = full_tx_stats[sorted(
+        full_tx_stats.keys())[-1]]['pt_total']['packets']
+    packets_rx = full_rx_stats[sorted(
+        full_rx_stats.keys())[-1]]['pr_total']['packets']
 
     lprint("    - Packets send by Tester      : {:-20,}".format(packets_tx))
 
-    lprint("    - Packets received by physical: {:-20,} [Lost {:,}, Drop {:,}]".
-           format(pp_rx, packets_tx - pp_rx, pp_rx_drop))
+    lprint("    - Packets received by physical: {:-20,} [Lost {:,}, Drop "
+           "{:,}]".format(pp_rx, packets_tx - pp_rx, pp_rx_drop))
 
-    lprint("    - Packets received by virtual : {:-20,} [Lost {:,}, Drop {:,}]".
-           format(vp_tx, pp_rx - vp_tx, vp_tx_drop))
+    lprint("    - Packets received by virtual : {:-20,} [Lost {:,}, Drop "
+           "{:,}]".format(vp_tx, pp_rx - vp_tx, vp_tx_drop))
 
-    lprint("    - Packets send by virtual     : {:-20,} [Lost {:,}, Drop {:,}]".
-           format(vp_rx, vp_tx - vp_rx, vp_rx_drop))
+    lprint("    - Packets send by virtual     : {:-20,} [Lost {:,}, Drop "
+           "{:,}]".format(vp_rx, vp_tx - vp_rx, vp_rx_drop))
 
-    lprint("    - Packets send by physical    : {:-20,} [Lost {:,}, Drop {:,}]".
-           format(pp_tx, vp_rx - pp_tx, pp_tx_drop))
+    lprint("    - Packets send by physical    : {:-20,} [Lost {:,}, Drop "
+           "{:,}]".format(pp_tx, vp_rx - pp_tx, pp_tx_drop))
 
     lprint("    - Packets received by Tester  : {:-20,} [Lost {:,}]".
            format(packets_rx, pp_tx - packets_rx))
 
     lprint("    - Receive rate on VM: {:,} pps".format(vm_pkts_sec))
 
-    rx_pkts_sec = get_packets_per_second_from_traffic_generator_rx_stats(full_rx_stats)
+    rx_pkts_sec = get_packets_per_second_from_traffic_generator_rx_stats(
+        full_rx_stats)
     lprint("  ! Result, average: {:,} pps".format(rx_pkts_sec))
 
     ##################################################
     lprint("  * Restoring state for next test...")
     tester.unconfigure_traffic_stream(config.tester_interface)
 
-    # dut_shell.dut_exec('sh -c "ovs-ofctl del-flows {0} && ovs-appctl dpctl/del-flows"'.\
+    # dut_shell.dut_exec('sh -c "ovs-ofctl del-flows {0} && '
+    #                    'ovs-appctl dpctl/del-flows"'.\
     #                    format(config.bridge_name),
     #                    die_on_error=True)
 
@@ -515,8 +540,8 @@ def test_p2v2p(nr_of_flows, packet_sizes):
 
     for packet_size in packet_sizes:
         results = test_p2v2p_single_packet_size(nr_of_flows, packet_size,
-                                                decrease_rate=100 -
-                                                config.traffic_rate)
+                                                decrease_rate=100
+                                                - config.traffic_rate)
 
         cpu_results.append(results["cpu_stats"])
         p2v2p_results.append(results["rx_packets_second"])
@@ -557,12 +582,14 @@ def test_p2v(nr_of_flows, packet_sizes):
 
         ##################################################
         lprint("  * Initializing packet generation...")
-        tester.configure_traffic_stream(config.tester_interface,
-                                        get_traffic_generator_flow(),
-                                        nr_of_flows, packet_size,
-                                        traffic_dst_mac=config.dst_mac_address,
-                                        traffic_src_mac=config.src_mac_address,
-                                        percentage=config.traffic_rate * 10000)
+        tester.configure_traffic_stream(
+            config.tester_interface,
+            get_traffic_generator_flow(),
+            nr_of_flows, packet_size,
+            traffic_dst_mac=config.dst_mac_address,
+            traffic_src_mac=config.src_mac_address,
+            percentage=config.traffic_rate * 10000,
+            random_payload=config.payload_packet_random)
 
         ##################################################
         if config.warm_up:
@@ -577,10 +604,10 @@ def test_p2v(nr_of_flows, packet_sizes):
         lprint("  * Clear all statistics...")
         tester.clear_statistics(config.tester_interface)
 
-        pp_rx_start \
-            = get_of_port_packet_stats(of_interfaces[config.physical_interface])[2]
-        vp_tx_start, vp_tx_drop_start \
-            = get_of_port_packet_stats(of_interfaces[config.virtual_interface])[0:2]
+        pp_rx_start = get_of_port_packet_stats(
+            of_interfaces[config.physical_interface])[2]
+        vp_tx_start, vp_tx_drop_start = get_of_port_packet_stats(
+            of_interfaces[config.virtual_interface])[0:2]
 
         ##################################################
         lprint("  * Start packet receiver on VM...")
@@ -592,7 +619,8 @@ def test_p2v(nr_of_flows, packet_sizes):
         start_cpu_monitoring()
 
         ##################################################
-        lprint("  * Start packet generation for {0} seconds...".format(config.run_time))
+        lprint("  * Start packet generation for {0} seconds...".format(
+            config.run_time))
         tester.start_traffic(config.tester_interface)
         for i in range(1, config.run_time):
             time.sleep(1)
@@ -614,20 +642,22 @@ def test_p2v(nr_of_flows, packet_sizes):
         lprint("  * Gathering statistics...")
 
         tester.take_tx_statistics_snapshot(config.tester_interface)
-        full_tx_stats = tester.get_tx_statistics_snapshots(config.tester_interface)
+        full_tx_stats = tester.get_tx_statistics_snapshots(
+            config.tester_interface)
         slogger.debug(" full_tx_stats={}".format(full_tx_stats))
 
-        pp_rx_end \
-            = get_of_port_packet_stats(of_interfaces[config.physical_interface])[2]
-        vp_tx_end, vp_tx_drop_end \
-            = get_of_port_packet_stats(of_interfaces[config.virtual_interface])[0:2]
+        pp_rx_end = get_of_port_packet_stats(
+            of_interfaces[config.physical_interface])[2]
+        vp_tx_end, vp_tx_drop_end = get_of_port_packet_stats(
+            of_interfaces[config.virtual_interface])[0:2]
         pp_rx = pp_rx_end - pp_rx_start
         vp_tx = vp_tx_end - vp_tx_start
         vp_tx_drop = vp_tx_drop_end - vp_tx_drop_start
 
         vm_pkts_sec = get_traffic_rx_stats_from_vm(config.dut_vm_address)
 
-        packets_tx = full_tx_stats[sorted(full_tx_stats.keys())[-1]]['pt_total']['packets']
+        packets_tx = full_tx_stats[sorted(
+            full_tx_stats.keys())[-1]]['pt_total']['packets']
 
         lprint("    - Packets send by Tester {:,}".format(packets_tx))
 
@@ -649,7 +679,8 @@ def test_p2v(nr_of_flows, packet_sizes):
         lprint("  * Restoring state for next test...")
         tester.unconfigure_traffic_stream(config.tester_interface)
 
-        # dut_shell.dut_exec('sh -c "ovs-ofctl del-flows {0} && ovs-appctl dpctl/del-flows"'.\
+        # dut_shell.dut_exec('sh -c "ovs-ofctl del-flows {0} && '
+        #                    'ovs-appctl dpctl/del-flows"'.\
         #                    format(config.bridge_name),
         #                    die_on_error=True)
 
@@ -694,12 +725,14 @@ def test_p2p(nr_of_flows, packet_sizes):
 
         ##################################################
         lprint("  * Initializing packet generation...")
-        tester.configure_traffic_stream(config.tester_interface,
-                                        get_traffic_generator_flow(),
-                                        nr_of_flows, packet_size,
-                                        traffic_dst_mac=config.dst_mac_address,
-                                        traffic_src_mac=config.src_mac_address,
-                                        percentage=config.traffic_rate * 10000)
+        tester.configure_traffic_stream(
+            config.tester_interface,
+            get_traffic_generator_flow(),
+            nr_of_flows, packet_size,
+            traffic_dst_mac=config.dst_mac_address,
+            traffic_src_mac=config.src_mac_address,
+            percentage=config.traffic_rate * 10000,
+            random_payload=config.payload_packet_random)
 
         ##################################################
         if config.warm_up:
@@ -769,21 +802,25 @@ def test_p2p(nr_of_flows, packet_sizes):
         rpp_tx = rpp_tx_end - rpp_tx_start
         rpp_tx_drop = rpp_tx_drop_end - rpp_tx_drop_start
 
-        packets_tx = full_tx_stats[sorted(full_tx_stats.keys())[-1]]['pt_total']['packets']
-        packets_rx = full_rx_stats[sorted(full_rx_stats.keys())[-1]]['pr_total']['packets']
+        packets_tx = full_tx_stats[sorted(
+            full_tx_stats.keys())[-1]]['pt_total']['packets']
+        packets_rx = full_rx_stats[sorted(
+            full_rx_stats.keys())[-1]]['pr_total']['packets']
 
-        lprint("    - Packets send by Tester         : {:-20,}".format(packets_tx))
+        lprint("    - Packets send by Tester         : {:-20,}".format(
+            packets_tx))
 
-        lprint("    - Packets received by physical   : {:-20,} [Lost {:,}, Drop {:,}]".
-               format(pp_rx, packets_tx - pp_rx, pp_rx_drop))
+        lprint("    - Packets received by physical   : {:-20,} [Lost {:,}, "
+               "Drop {:,}]".format(pp_rx, packets_tx - pp_rx, pp_rx_drop))
 
-        lprint("    - Packets send by second physical: {:-20,} [Lost {:,}, Drop {:,}]".
-               format(rpp_tx, pp_rx - rpp_tx, rpp_tx_drop))
+        lprint("    - Packets send by second physical: {:-20,} [Lost {:,}, "
+               "Drop {:,}]".format(rpp_tx, pp_rx - rpp_tx, rpp_tx_drop))
 
         lprint("    - Packets received by Tester     : {:-20,} [Lost {:,}]".
                format(packets_rx, rpp_tx - packets_rx))
 
-        rx_pkts_sec = get_packets_per_second_from_traffic_generator_rx_stats(full_rx_stats)
+        rx_pkts_sec = get_packets_per_second_from_traffic_generator_rx_stats(
+            full_rx_stats)
 
         lprint("  ! Result, average: {:,} pps".format(rx_pkts_sec))
 
@@ -793,7 +830,8 @@ def test_p2p(nr_of_flows, packet_sizes):
         ##################################################
         lprint("  * Restoring state for next test...")
         tester.unconfigure_traffic_stream(config.tester_interface)
-        # dut_shell.dut_exec('sh -c "ovs-ofctl del-flows {0} && ovs-appctl dpctl/del-flows"'.\
+        # dut_shell.dut_exec('sh -c "ovs-ofctl del-flows {0} && '
+        #                    'ovs-appctl dpctl/del-flows"'.\
         #                    format(config.bridge_name),
         #                    die_on_error=True)
 
@@ -845,7 +883,9 @@ def test_p_single_packet_size(nr_of_flows, packet_size, **kwargs):
                                     nr_of_flows, packet_size,
                                     traffic_dst_mac=config.dst_mac_address,
                                     traffic_src_mac=config.src_mac_address,
-                                    percentage=1000000 - decrease_rate)
+                                    percentage=1000000 - decrease_rate,
+                                    random_payload=config.payload_packet_random
+                                    )
 
     ##################################################
     if config.warm_up:
@@ -873,7 +913,8 @@ def test_p_single_packet_size(nr_of_flows, packet_size, **kwargs):
     start_cpu_monitoring()
 
     ##################################################
-    lprint("  * Start packet generation for {0} seconds...".format(config.run_time))
+    lprint("  * Start packet generation for {0} seconds...".format(
+        config.run_time))
     tester.start_traffic(config.tester_interface)
     for i in range(1, config.run_time):
         time.sleep(1)
@@ -906,28 +947,32 @@ def test_p_single_packet_size(nr_of_flows, packet_size, **kwargs):
     pp_rx_drop = pp_rx_drop_end - pp_rx_drop_start
     pp_tx_drop = pp_tx_drop_end - pp_tx_drop_start
 
-    packets_tx = full_tx_stats[sorted(full_tx_stats.keys())[-1]]['pt_total']['packets']
-    packets_rx = full_rx_stats[sorted(full_rx_stats.keys())[-1]]['pr_total']['packets']
+    packets_tx = full_tx_stats[sorted(
+        full_tx_stats.keys())[-1]]['pt_total']['packets']
+    packets_rx = full_rx_stats[sorted(
+        full_rx_stats.keys())[-1]]['pr_total']['packets']
 
     lprint("    - Packets send by Tester      : {:-20,}".format(packets_tx))
 
-    lprint("    - Packets received by physical: {:-20,} [Lost {:,}, Drop {:,}]".
-           format(pp_rx, packets_tx - pp_rx, pp_rx_drop))
+    lprint("    - Packets received by physical: {:-20,} [Lost {:,}, Drop "
+           "{:,}]".format(pp_rx, packets_tx - pp_rx, pp_rx_drop))
 
-    lprint("    - Packets send by physical    : {:-20,} [Lost {:,}, Drop {:,}]".
-           format(pp_tx, pp_rx - pp_tx, pp_tx_drop))
+    lprint("    - Packets send by physical    : {:-20,} [Lost {:,}, Drop "
+           "{:,}]".format(pp_tx, pp_rx - pp_tx, pp_tx_drop))
 
     lprint("    - Packets received by Tester  : {:-20,} [Lost {:,}]".
            format(packets_rx, pp_tx - packets_rx))
 
-    rx_pkts_sec = get_packets_per_second_from_traffic_generator_rx_stats(full_rx_stats)
+    rx_pkts_sec = get_packets_per_second_from_traffic_generator_rx_stats(
+        full_rx_stats)
     lprint("  ! Result, average: {:,} pps".format(rx_pkts_sec))
 
     ##################################################
     lprint("  * Restoring state for next test...")
     tester.unconfigure_traffic_stream(config.tester_interface)
 
-    # dut_shell.dut_exec('sh -c "ovs-ofctl del-flows {0} && ovs-appctl dpctl/del-flows"'.\
+    # dut_shell.dut_exec('sh -c "ovs-ofctl del-flows {0} && '
+    #                    'ovs-appctl dpctl/del-flows"'.\
     #                    format(config.bridge_name),
     #                    die_on_error=True)
 
@@ -953,8 +998,8 @@ def test_p(nr_of_flows, packet_sizes):
 
     for packet_size in packet_sizes:
         results = test_p_single_packet_size(nr_of_flows, packet_size,
-                                            decrease_rate=100 -
-                                            config.traffic_rate)
+                                            decrease_rate=100
+                                            - config.traffic_rate)
 
         cpu_results.append(results["cpu_stats"])
         p_results.append(results["rx_packets_second"])
@@ -1014,7 +1059,8 @@ def test_p2v2p_zero_loss(stream_size_list, packet_size_list, **kwargs):
                               test_results[nr_of_streams][packet_size]
                               ["rx_packets_second"]))
             else:
-                test_results[nr_of_streams][packet_size] = results[min(results)]
+                test_results[nr_of_streams][packet_size] = results[
+                    min(results)]
                 lprint("  ! Zero pkt loss for {} bytes, NOT reached!!".
                        format(packet_size))
 
@@ -1213,7 +1259,7 @@ def test_vxlan(nr_of_flows, packet_sizes):
         ##################################################
         lprint("- [TEST: {0}(flows={1}, packet_size={2}, rate={3:.3f}%)]"
                " START".format(inspect.currentframe().f_code.co_name,
-                               nr_of_flows, packet_size))
+                               nr_of_flows, packet_size, config.traffic_rate))
 
         ##################################################
         lprint("  * Get bridge MAC address...")
@@ -1232,31 +1278,32 @@ def test_vxlan(nr_of_flows, packet_sizes):
             #
             lprint("  * Setup neighbor entry...")
             dut_shell.dut_exec('sh -c "ovs-appctl tnl/neigh/set {} '
-                               ' 3.1.1.2 00:00:00:00:00:01"'.format(tunnel_bridge),
-                               die_on_error=True)
+                               ' 3.1.1.2 00:00:00:00:00:01"'.format(
+                                   tunnel_bridge), die_on_error=True)
             dut_shell.dut_exec('sh -c "ip addr add 3.1.1.1/24 dev {0};'
                                'ip link set {0} up"'.format(tunnel_bridge),
                                die_on_error=True)
 
         ##################################################
         lprint("  * Initializing packet generation...")
-        tester.configure_traffic_stream(config.tester_interface,
-                                        TrafficFlowType.vxlan_l3_ipv4,
-                                        nr_of_flows, packet_size,
-                                        tunnel_dst_mac=tunnel_dst_mac,
-                                        traffic_dst_mac=config.dst_mac_address,
-                                        percentage=config.traffic_rate * 10000)
+        tester.configure_traffic_stream(
+            config.tester_interface,
+            TrafficFlowType.vxlan_l3_ipv4,
+            nr_of_flows, packet_size,
+            tunnel_dst_mac=tunnel_dst_mac,
+            traffic_dst_mac=config.dst_mac_address,
+            percentage=config.traffic_rate * 10000,
+            random_payload=config.payload_packet_random)
 
         ##################################################
         lprint("  * Clear all statistics...")
         tester.clear_statistics(config.tester_interface)
 
-        pp_rx_start \
-            = get_of_port_packet_stats(of_interfaces[config.physical_interface],
-                                       bridge=tunnel_bridge)[2]
+        pp_rx_start = get_of_port_packet_stats(
+            of_interfaces[config.physical_interface], bridge=tunnel_bridge)[2]
 
-        vp_tx_start, vp_tx_drop_start \
-            = get_of_port_packet_stats(of_interfaces[config.virtual_interface])[0:2]
+        vp_tx_start, vp_tx_drop_start = get_of_port_packet_stats(
+            of_interfaces[config.virtual_interface])[0:2]
 
         ##################################################
         lprint("  * Start packet receiver on VM...")
@@ -1291,21 +1338,23 @@ def test_vxlan(nr_of_flows, packet_sizes):
         lprint("  * Gathering statistics...")
 
         tester.take_tx_statistics_snapshot(config.tester_interface)
-        full_tx_stats = tester.get_tx_statistics_snapshots(config.tester_interface)
+        full_tx_stats = tester.get_tx_statistics_snapshots(
+            config.tester_interface)
         slogger.debug(" full_tx_stats={}".format(full_tx_stats))
 
-        pp_rx_end = get_of_port_packet_stats(of_interfaces[config.physical_interface],
-                                             bridge=tunnel_bridge)[2]
+        pp_rx_end = get_of_port_packet_stats(
+            of_interfaces[config.physical_interface], bridge=tunnel_bridge)[2]
 
-        vp_tx_end, vp_tx_drop_end \
-            = get_of_port_packet_stats(of_interfaces[config.virtual_interface])[0:2]
+        vp_tx_end, vp_tx_drop_end = get_of_port_packet_stats(
+            of_interfaces[config.virtual_interface])[0:2]
         pp_rx = pp_rx_end - pp_rx_start
         vp_tx = vp_tx_end - vp_tx_start
         vp_tx_drop = vp_tx_drop_end - vp_tx_drop_start
 
         vm_pkts_sec = get_traffic_rx_stats_from_vm(config.dut_vm_address)
 
-        packets_tx = full_tx_stats[sorted(full_tx_stats.keys())[-1]]['pt_total']['packets']
+        packets_tx = full_tx_stats[sorted(
+            full_tx_stats.keys())[-1]]['pt_total']['packets']
 
         lprint("    - Packets send by Tester {:,}".format(packets_tx))
 
@@ -1473,11 +1522,11 @@ def start_traffic_rx_on_vm(vm, pci):
     cpu_mask = ((1 << (config.dut_vm_nic_queues + 1)) - 1)
     pmd_cpu_mask = cpu_mask & ~0x1
     disable_hw_vlan = " --disable-hw-vlan" if vm_dpdk_version < \
-                      StrictVersion('18.2.0') else ""
+                      Version('18.2.0') else ""
     legacy_mem = " --legacy-mem" if vm_dpdk_version >= \
-                 StrictVersion('18.5.0') else ""
+                 Version('18.5.0') else ""
     auto_delay = DELAY_TEST_PMD if config.testpmd_startup_delay == 0 else ""
-    pci_flag = "-w" if vm_dpdk_version < StrictVersion('20.11.0') else "-a"
+    pci_flag = "-w" if vm_dpdk_version < Version('20.11.0') else "-a"
 
     cmd = r"sshpass -p {2} ssh -o UserKnownHostsFile=/dev/null " \
           r"-o StrictHostKeyChecking=no -n {1}@{0} " \
@@ -1522,11 +1571,11 @@ def start_traffic_loop_on_vm(vm, pci):
     pmd_cpu_mask = cpu_mask & ~0x1
     mac_swap = " --forward-mode=macswap" if config.mac_swap else ""
     disable_hw_vlan = " --disable-hw-vlan" if vm_dpdk_version < \
-                      StrictVersion('18.2.0') else ""
+                      Version('18.2.0') else ""
     legacy_mem = " --legacy-mem" if vm_dpdk_version >= \
-                 StrictVersion('18.5.0') else ""
+                 Version('18.5.0') else ""
     auto_delay = DELAY_TEST_PMD if config.testpmd_startup_delay == 0 else ""
-    pci_flag = "-w" if vm_dpdk_version < StrictVersion('20.11.0') else "-a"
+    pci_flag = "-w" if vm_dpdk_version < Version('20.11.0') else "-a"
 
     cmd = r"sshpass -p {2} ssh -o UserKnownHostsFile=/dev/null " \
           r"-o StrictHostKeyChecking=no -n {1}@{0} " \
@@ -1566,10 +1615,12 @@ def get_traffic_rx_stats_from_vm(vm, **kwargs):
           "'cat ~/results.txt | grep -E \"Rx-pps|Tx-pps\"'". \
           format(vm, config.dut_vm_user, config.dut_vm_password)
 
-    result = dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd], die_on_error=True)
+    result = dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd],
+                                die_on_error=True)
 
     pkt_rates = [int(re.sub(r'^\s*Rx-pps:\s*', '', s))
-                 for s in re.findall(r'^\s*Rx-pps:\s*\\d+', result.stdout_output,
+                 for s in re.findall(r'^\s*Rx-pps:\s*\d+',
+                                     result.stdout_output,
                                      re.MULTILINE)]
 
     if skip_samples > 0:
@@ -1657,7 +1708,8 @@ def get_traffic_tx_stats_from_vm(vm):
           r"'cat ~/results.txt | grep port0.tx_packets'". \
           format(vm, config.dut_vm_user, config.dut_vm_password)
 
-    result = dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd], die_on_error=True)
+    result = dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd],
+                                die_on_error=True)
 
     return get_packets_per_second_from_pkt_counters(result.stdout_output, 5)
 
@@ -1802,12 +1854,13 @@ def create_ovs_bidirectional_of_phy_rules(src_port, dst_port):
     lprint("  * Verify that of physical port flows exists...")
 
     result \
-        = dut_shell.dut_exec('sh -c "ovs-ofctl dump-flows {0} | grep -v \'NXST_FLOW reply\'"'.
+        = dut_shell.dut_exec('sh -c "ovs-ofctl dump-flows {0} | '
+                             'grep -v \'NXST_FLOW reply\'"'.
                              format(config.bridge_name),
                              die_on_error=True)
 
     if result.output.count('\n') != 2:
-        lprint("ERROR: Only 2 flows should exsits, but there are {1}!".
+        lprint("ERROR: Only 2 flows should exsits, but there are {0}!".
                format(result.output.count('\n') - 1))
         sys.exit(-1)
 
@@ -1833,12 +1886,13 @@ def create_ovs_of_phy_rule(src_port, dst_port, **kwargs):
     lprint("  * Verify that of physical port flows exists...")
 
     result \
-        = dut_shell.dut_exec('sh -c "ovs-ofctl dump-flows {0} | grep -v \'NXST_FLOW reply\'"'.
+        = dut_shell.dut_exec('sh -c "ovs-ofctl dump-flows {0} | '
+                             'grep -v \'NXST_FLOW reply\'"'.
                              format(config.bridge_name),
                              die_on_error=True)
 
     if result.output.count('\n') != 1:
-        lprint("ERROR: Only 2 flows should exsits, but there are {1}!".
+        lprint("ERROR: Only 2 flows should exsits, but there are {0}!".
                format(result.output.count('\n') - 1))
         sys.exit(-1)
 
@@ -1866,8 +1920,10 @@ def create_ovs_l2_of_rules(number_of_flows, src_port, dst_port, **kwargs):
 
     cmd = "python -c 'for i in range({4}, {0}): " \
           "print(\"add in_port={2}," \
-          "dl_dst={{0:02x}}:{{1:02x}}:{{2:02x}}:{{3:02x}}:{{4:02x}}:{{5:02x}}," \
-          "action={3}\".format((i >> 40) & 0xff, (i >> 32) & 0xff, (i >> 24) " \
+          "dl_dst=" \
+          "{{0:02x}}:{{1:02x}}:{{2:02x}}:{{3:02x}}:{{4:02x}}:{{5:02x}}," \
+          "action=" \
+          "{3}\".format((i >> 40) & 0xff, (i >> 32) & 0xff, (i >> 24) " \
           "& 0xff, (i >> 16) & 0xff, (i >> 8) & 0xff, i & 0xff))'" \
           " | ovs-ofctl add-flow {1} -". \
           format(number_of_flows + base_mac, config.bridge_name,
@@ -1878,10 +1934,10 @@ def create_ovs_l2_of_rules(number_of_flows, src_port, dst_port, **kwargs):
     if total_nr_of_flows != 0:
         lprint("  * Verify requested number of flows exists...")
 
-        result \
-            = dut_shell.dut_exec('sh -c "ovs-ofctl dump-flows {0} | grep -v \'NXST_FLOW reply\' | wc -l"'.
-                                 format(config.bridge_name),
-                                 die_on_error=True)
+        result = dut_shell.dut_exec('sh -c "ovs-ofctl dump-flows {0} | '
+                                    'grep -v \'NXST_FLOW reply\' | wc -l"'.
+                                    format(config.bridge_name),
+                                    die_on_error=True)
 
         if int(result.stdout_output) != total_nr_of_flows:
             lprint("ERROR: Only {0} flows should exsits, but there are {1}!".
@@ -1964,7 +2020,8 @@ def create_ovs_l3_of_rules(number_of_flows, src_port, dst_port, **kwargs):
 
     cmd = "python -c 'for i in range({4}, {0}): " \
           "print(\"add in_port={2}," \
-          "eth_type(0x800),nw_src={{}}.{{}}.{{}}.{{}},nw_dst={{}}.{{}}.{{}}.{{}}," \
+          "eth_type(0x800)," \
+          "nw_src={{}}.{{}}.{{}}.{{}},nw_dst={{}}.{{}}.{{}}.{{}}," \
           "action={3}\".format(" \
           "(i >> 24) & 0xff, (i >> 16) & 0xff," \
           "(i >> 8) & 0xff, i & 0xff," \
@@ -1979,10 +2036,10 @@ def create_ovs_l3_of_rules(number_of_flows, src_port, dst_port, **kwargs):
     if total_nr_of_flows != 0:
         lprint("  * Verify requested number of flows exists...")
 
-        result \
-            = dut_shell.dut_exec('sh -c "ovs-ofctl dump-flows {0} | grep -v \'NXST_FLOW reply\' | wc -l"'.
-                                 format(config.bridge_name),
-                                 die_on_error=True)
+        result = dut_shell.dut_exec('sh -c "ovs-ofctl dump-flows {0} | '
+                                    'grep -v \'NXST_FLOW reply\' | wc -l"'.
+                                    format(config.bridge_name),
+                                    die_on_error=True)
 
         if int(result.stdout_output) != total_nr_of_flows:
             lprint("ERROR: Only {0} flows should exsits, but there are {1}!".
@@ -1993,9 +2050,11 @@ def create_ovs_l3_of_rules(number_of_flows, src_port, dst_port, **kwargs):
 #
 # Add OVS Bidirectional L3 OpenFlow rules
 #
-def create_ovs_bidirectional_l3_of_rules(number_of_flows, src_port, dst_port, **kwargs):
+def create_ovs_bidirectional_l3_of_rules(number_of_flows, src_port, dst_port,
+                                         **kwargs):
     clear_rules = kwargs.pop("clear_rules", True)
-    total_nr_of_flows = kwargs.pop("total_number_of_flows", number_of_flows * 2)
+    total_nr_of_flows = kwargs.pop("total_number_of_flows",
+                                   number_of_flows * 2)
     ip_start_offset = kwargs.pop("ipv4_start", 0x01000000)
 
     create_ovs_l3_of_rules(number_of_flows,
@@ -2064,10 +2123,10 @@ def create_ovs_l3_of_slash_16_rules(number_of_flows,
     if total_nr_of_flows != 0:
         lprint("  * Verify requested number of flows exists...")
 
-        result \
-            = dut_shell.dut_exec('sh -c "ovs-ofctl dump-flows {0} | grep -v \'NXST_FLOW reply\' | wc -l"'.
-                                 format(config.bridge_name),
-                                 die_on_error=True)
+        result = dut_shell.dut_exec('sh -c "ovs-ofctl dump-flows {0} | '
+                                    'grep -v \'NXST_FLOW reply\' | wc -l"'.
+                                    format(config.bridge_name),
+                                    die_on_error=True)
 
         if int(result.stdout_output) != total_nr_of_flows:
             lprint("ERROR: Only {0} flows should exsits, but there are {1}!".
@@ -2114,10 +2173,10 @@ def create_ovs_l4_of_rules(number_of_flows, src_port, dst_port, **kwargs):
     if total_nr_of_flows != 0:
         lprint("  * Verify requested number of flows exists...")
 
-        result \
-            = dut_shell.dut_exec('sh -c "ovs-ofctl dump-flows {0} | grep -v \'NXST_FLOW reply\' | wc -l"'.
-                                 format(config.bridge_name),
-                                 die_on_error=True)
+        result = dut_shell.dut_exec('sh -c "ovs-ofctl dump-flows {0} | '
+                                    'grep -v \'NXST_FLOW reply\' | wc -l"'.
+                                    format(config.bridge_name),
+                                    die_on_error=True)
 
         if int(result.stdout_output) != total_nr_of_flows:
             lprint("ERROR: Only {0} flows should exsits, but there are {1}!".
@@ -2128,7 +2187,9 @@ def create_ovs_l4_of_rules(number_of_flows, src_port, dst_port, **kwargs):
 #
 # Add OVS Bidirectional L4 OpenFlow rules
 #
-def create_ovs_bidirectional_l4_of_rules(number_of_flows, src_port, dst_port, **kwargs):
+def create_ovs_bidirectional_l4_of_rules(number_of_flows, src_port, dst_port,
+                                         **kwargs):
+
     create_ovs_l4_of_rules(number_of_flows,
                            src_port,
                            dst_port)
@@ -2167,7 +2228,8 @@ def create_ovs_bridge():
     command = "ovs-vsctl add-br {0} ".format(config.bridge_name)
 
     if dpdk:
-        command += "-- set Bridge {} datapath_type=netdev ".format(config.bridge_name)
+        command += "-- set Bridge {} datapath_type=netdev ".format(
+            config.bridge_name)
 
     #
     # Add basic ports (1x ingress, and 1x egress)
@@ -2176,7 +2238,8 @@ def create_ovs_bridge():
                format(config.bridge_name, config.physical_interface)
 
     if config.virtual_interface:
-        command += "-- add-port {0} {1} -- set Interface {1} ofport_request=20 ". \
+        command += "-- add-port {0} {1} -- set Interface {1} " \
+                   "ofport_request=20 ". \
                    format(config.bridge_name, config.virtual_interface)
 
     if dpdk:
@@ -2191,7 +2254,8 @@ def create_ovs_bridge():
             command += "-- set Interface {0} options:n_rxq={1} " \
                        "other_config:pmd-rxq-affinity={2} " . \
                        format(config.physical_interface,
-                              config.pmd_rxq_affinity.count(':'), config.pmd_rxq_affinity)
+                              config.pmd_rxq_affinity.count(':'),
+                              config.pmd_rxq_affinity)
 
             if config.virtual_interface:
                 command += "-- set Interface {0} options:n_rxq={1} " \
@@ -2203,9 +2267,9 @@ def create_ovs_bridge():
     # Add second virtual ports if vv test is enabled
     #
     if not config.skip_vv_test:
-        command += "-- add-port {0} {1} -- set Interface {1} ofport_request=21 ". \
-            format(config.bridge_name,
-                   config.second_virtual_interface)
+        command += "-- add-port {0} {1} -- set Interface {1} " \
+                   "ofport_request=21 ".format(config.bridge_name,
+                                               config.second_virtual_interface)
 
         if dpdk:
             command += "-- set Interface {0} type=dpdkvhostuser ". \
@@ -2215,15 +2279,16 @@ def create_ovs_bridge():
                 command += "-- set Interface {0} options:n_rxq={1} " \
                            "other_config:pmd-rxq-affinity={2} ". \
                            format(config.second_virtual_interface,
-                                  config.pmd_rxq_affinity.count(':'), config.pmd_rxq_affinity)
+                                  config.pmd_rxq_affinity.count(':'),
+                                  config.pmd_rxq_affinity)
 
     #
     # Add second physical port if pp test is enabled
     #
     if config.run_pp_test:
-        command += "-- add-port {0} {1} -- set Interface {1} ofport_request=11 ". \
-            format(config.bridge_name,
-                   config.second_physical_interface)
+        command += "-- add-port {0} {1} -- set Interface {1} " \
+                   "ofport_request=11 ".format(
+                       config.bridge_name, config.second_physical_interface)
 
         if dpdk:
             command += "-- set Interface {0} type=dpdk ". \
@@ -2241,7 +2306,7 @@ def create_ovs_bridge():
     # addresses for the physical ports.
     #
 
-    if dpdk and StrictVersion(ovs_version) >= StrictVersion('2.7.0'):
+    if dpdk and ovs_version >= Version('2.7.0'):
         if not check_pci_address_string(config.physical_interface_pci) or \
            (config.run_pp_test and not
            check_pci_address_string(config.second_physical_interface_pci)):
@@ -2271,7 +2336,8 @@ def create_ovs_bridge():
     # working. So we pause here, asking for restart of the VM.
     #
     if dpdk and config.virtual_interface:
-        print("!!! Finished configuring the OVS bridge, please restart the Virtual Machine !!!")
+        print("!!! Finished configuring the OVS bridge, please restart the "
+              "Virtual Machine !!!")
         raw_input("Press Enter to continue...")
 
 
@@ -2303,16 +2369,20 @@ def create_ovs_vxlan_bridge():
               .format(config.bridge_name, tunnel_bridge)
 
     if dpdk:
-        command += "-- set Bridge {} datapath_type=netdev ".format(config.bridge_name)
-        command += "-- set Bridge {} datapath_type=netdev ".format(tunnel_bridge)
+        command += "-- set Bridge {} datapath_type=netdev ".format(
+            config.bridge_name)
+        command += "-- set Bridge {} datapath_type=netdev ".format(
+            tunnel_bridge)
 
     #
     # Add basic ports (1x ingress, and 1x egress)
     #
     command += "-- add-port {3} {1} -- set Interface {1} ofport_request=10 " \
                "-- add-port {0} {2} -- set Interface {2} ofport_request=20 " \
-               "-- add-port {0} vxlan0 -- set Interface vxlan0 ofport_request=30 " \
-               "-- set interface vxlan0 type=vxlan options:remote_ip=3.1.1.2 options:key=69 ". \
+               "-- add-port {0} vxlan0 -- set Interface vxlan0 " \
+               "ofport_request=30 " \
+               "-- set interface vxlan0 type=vxlan " \
+               "options:remote_ip=3.1.1.2 options:key=69 ". \
                format(config.bridge_name,
                       config.physical_interface,
                       config.virtual_interface,
@@ -2328,15 +2398,17 @@ def create_ovs_vxlan_bridge():
                        "other_config:pmd-rxq-affinity={3} " \
                        "-- set Interface {1} options:n_rxq={2} " \
                        "other_config:pmd-rxq-affinity={3} ". \
-                       format(config.physical_interface, config.virtual_interface,
-                              config.pmd_rxq_affinity.count(':'), config.pmd_rxq_affinity)
+                       format(config.physical_interface,
+                              config.virtual_interface,
+                              config.pmd_rxq_affinity.count(':'),
+                              config.pmd_rxq_affinity)
 
     #
     # If we are running DPDK and it's 2.7 or higher we need to specify the PCI
     # addresses for the physical ports.
     #
 
-    if dpdk and StrictVersion(ovs_version) >= StrictVersion('2.7.0'):
+    if dpdk and ovs_version >= Version('2.7.0'):
         if not check_pci_address_string(config.physical_interface_pci) or \
            (config.run_pp_test and not
            check_pci_address_string(config.second_physical_interface_pci)):
@@ -2361,7 +2433,8 @@ def create_ovs_vxlan_bridge():
     # working. So we pause here, asking for restart of the VM.
     #
     if dpdk:
-        print("!!! Finished configuring the OVS bridge, please restart the Virtual Machine !!!")
+        print("!!! Finished configuring the OVS bridge, please restart the "
+              "Virtual Machine !!!")
         raw_input("Press Enter to continue...")
 
 
@@ -2423,8 +2496,8 @@ def get_bridge_port_numbers(tunnel=False):
         if m:
             dp[interface] = m.group(1)
         else:
-            lprint("ERROR: Can't figure out OpenFlow datapath interface for {0}"
-                   .format(interface))
+            lprint("ERROR: Can't figure out OpenFlow datapath interface "
+                   "for {0}".format(interface))
             sys.exit(-1)
 
     slogger.info("OpenFlow ports; {}".format(of))
@@ -2441,8 +2514,8 @@ def get_of_port_packet_stats(of_port, **kwargs):
     bridge = kwargs.pop("bridge", config.bridge_name)
     port_stats = of_dump_port_to_logfile(bridge)
 
-    m = re.search('\\s.*port *{}: rx pkts=.*\n.*tx pkts=([0-9?]*), '.format(of_port),
-                  port_stats.output)
+    m = re.search('\\s.*port *{}: rx pkts=.*\n.*tx pkts=([0-9?]*), '.format(
+        of_port), port_stats.output)
     if m:
         if '?' in m.group(1):
             tx = int(0)
@@ -2454,8 +2527,8 @@ def get_of_port_packet_stats(of_port, **kwargs):
                format(of_port, config.bridge_name))
         sys.exit(-1)
 
-    m = re.search('\\s.*port *{}: rx pkts=.*\n.*tx pkts=.* drop=([0-9?]*), .*'.format(of_port),
-                  port_stats.output)
+    m = re.search('\\s.*port *{}: rx pkts=.*\n.*tx pkts=.* '
+                  'drop=([0-9?]*), .*'.format(of_port), port_stats.output)
     if m:
         if '?' in m.group(1):
             tx_drop = int(0)
@@ -2480,20 +2553,21 @@ def get_of_port_packet_stats(of_port, **kwargs):
                format(of_port, config.bridge_name))
         sys.exit(-1)
 
-    m = re.search('\\s.*port *{}: rx pkts=.* drop=([0-9?]*), .*'.format(of_port),
-                  port_stats.output)
+    m = re.search('\\s.*port *{}: rx pkts=.* '
+                  'drop=([0-9?]*), .*'.format(of_port), port_stats.output)
     if m:
         if '?' in m.group(1):
             rx_drop = int(0)
         else:
             rx_drop = int(m.group(1))
     else:
-        lprint("ERROR: Can't get received drop stats for OpenFlow port {0} on brige \"{1}\""
-               .format(of_port, config.bridge_name))
+        lprint("ERROR: Can't get received drop stats for OpenFlow port {0} "
+               "on bridge \"{1}\"".format(of_port, config.bridge_name))
         sys.exit(-1)
 
-    slogger.debug("OF port {0} stats: tx = {1}, tx_drop = {2}, rx = {3}, tx_drop = {3}".
-                  format(of_port, tx, tx_drop, rx, rx_drop))
+    slogger.debug("OF port {0} stats: tx = {1}, tx_drop = {2}, "
+                  "rx = {3}, rx_drop = {4}".format(of_port, tx, tx_drop,
+                                                   rx, rx_drop))
 
     return tx, tx_drop, rx, rx_drop
 
@@ -2633,8 +2707,8 @@ def create_single_graph(x, y, x_label, y_label, title,
             handler_y_values.append(cpu_util[i]['ovs_cpu_handler'])
             urcu_y_values.append(cpu_util[i]['ovs_cpu_urcu'])
             other_y_values.append(cpu_util[i]['ovs_cpu_other'])
-            usr_y_values.append(cpu_util[i]['sys_usr'] -
-                                cpu_util[i]['ovs_cpu'])
+            usr_y_values.append(cpu_util[i]['sys_usr']
+                                - cpu_util[i]['ovs_cpu'])
             nice_y_values.append(cpu_util[i]['sys_nice'])
             sys_y_values.append(cpu_util[i]['sys_sys'])
             iowait_y_values.append(cpu_util[i]['sys_iowait'])
@@ -3184,8 +3258,10 @@ def check_pci_address_string(pci_address):
     if pci_address is None:
         return False
 
-    if re.match("^\\d{4}:\\d{2}:[0-9A-Fa-f]{2}\\.\\d{1}$", pci_address) is None and \
-       re.match("^\\d{4}:\\d{2}:[0-9A-Fa-f]{2}\\.\\d{1},txq_inline=\\d+$", pci_address) is None:
+    if re.match(r"^\d{4}:\d{2}:[0-9A-Fa-f]{2}\.\d{1}$",
+                pci_address) is None and \
+       re.match(r"^\d{4}:\d{2}:[0-9A-Fa-f]{2}\.\d{1},txq_inline=\d+$",
+                pci_address) is None:
         return False
 
     return True
@@ -3212,8 +3288,8 @@ def start_perf_recording(test_name):
     perf_path = "/root/ovs_test_perf_data/run_{}".format(run_start_time)
     perf_file = "{}/{}.perf".format(perf_path, test_name)
     cmd = r"mkdir -p {0}; " \
-          r"nohup perf record -o '{1}' -g -p `pidof ovs-vswitchd` &> /dev/null &". \
-          format(perf_path, perf_file)
+          r"nohup perf record -o '{1}' -g -p `pidof ovs-vswitchd` " \
+          r"&> /dev/null &".format(perf_path, perf_file)
 
     lprint("  * Start perf recording on DUT ({})...".format(perf_file))
     dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd], die_on_error=True)
@@ -3243,7 +3319,8 @@ def start_cpu_monitoring():
     # kill -SIGINT `pidof pidstat`
 
     cmd = r"rm -f /var/tmp/cpu_ovs.txt /var/tmp/cpu_mpstat.txt; " \
-          r"nohup pidstat -u -t -p `pidof ovs-vswitchd`,`pidof ovsdb-server` 1 > /var/tmp/cpu_ovs.txt 2> /dev/null & " \
+          r"nohup pidstat -u -t -p `pidof ovs-vswitchd`,"\
+          r"`pidof ovsdb-server` 1 > /var/tmp/cpu_ovs.txt 2> /dev/null & " \
           r"nohup mpstat -P ALL 1 > /var/tmp/cpu_mpstat.txt 2> /dev/null &"
     dut_shell.dut_exec('', raw_cmd=['sh', '-c', cmd], die_on_error=True)
 
@@ -3275,11 +3352,11 @@ def get_cpu_monitoring_stats():
     ovs_cpu_other = float(0)
 
     if "%guest   %wait    %CPU" in results.stdout_output:
-        #                    Average:   988      -   16979    0.00       0.00       0.00       0.00        0.00   -  |__ovs-vswitchd
-        regex = re.compile("^Average:\\s+[0-9]+\\s+-\\s+[0-9]+\\s+[0-9\\.]+\\s+[0-9\\.]+\\s+[0-9\\.]+\\s+[0-9\\.]+\\s+([0-9\\.]+).+__(.+)", re.MULTILINE)
+        #                    Average:   988      -   16979    0.00       0.00       0.00       0.00        0.00   -  |__ovs-vswitchd                       # noqa: E501
+        regex = re.compile("^Average:\\s+[0-9]+\\s+-\\s+[0-9]+\\s+[0-9\\.]+\\s+[0-9\\.]+\\s+[0-9\\.]+\\s+[0-9\\.]+\\s+([0-9\\.]+).+__(.+)", re.MULTILINE)  # noqa: E501
     else:
-        #                    Average:   0        -   6982     0.00       0.05       0.00        0.05   -  |__ovs-vswitchd
-        regex = re.compile("^Average:\\s+[0-9]+\\s+-\\s+[0-9]+\\s+[0-9\\.]+\\s+[0-9\\.]+\\s+[0-9\\.]+\\s+([0-9\\.]+).+__(.+)", re.MULTILINE)
+        #                    Average:   0        -   6982     0.00       0.05       0.00        0.05   -  |__ovs-vswitchd                     # noqa: E501
+        regex = re.compile("^Average:\\s+[0-9]+\\s+-\\s+[0-9]+\\s+[0-9\\.]+\\s+[0-9\\.]+\\s+[0-9\\.]+\\s+([0-9\\.]+).+__(.+)", re.MULTILINE)  # noqa: E501
 
     for match in regex.finditer(results.stdout_output):
         if match.group(2).startswith("pmd"):
@@ -3307,8 +3384,8 @@ def get_cpu_monitoring_stats():
     cpu_guest = float(0)
     cpu_gnice = float(0)
     cpu_idle = float(0)
-    #  %usr   %nice    %sys %iowait    %irq   %soft  %steal  %guest  %gnice   %idle
-    regex = re.compile("^Average:\\s+[0-9]+\\s+([0-9\\.]+)\\s+([0-9\\.]+)\\s+([0-9\\.]+)\\s+([0-9\\.]+)\\s+([0-9\\.]+)\\s+([0-9\\.]+)\\s+([0-9\\.]+)\\s+([0-9\\.]+)\\s+([0-9\\.]+)\\s+([0-9\\.]+)$",
+    #  %usr   %nice    %sys %iowait    %irq   %soft  %steal  %guest  %gnice   %idle    # noqa: E501
+    regex = re.compile("^Average:\\s+[0-9]+\\s+([0-9\\.]+)\\s+([0-9\\.]+)\\s+([0-9\\.]+)\\s+([0-9\\.]+)\\s+([0-9\\.]+)\\s+([0-9\\.]+)\\s+([0-9\\.]+)\\s+([0-9\\.]+)\\s+([0-9\\.]+)\\s+([0-9\\.]+)$",  # noqa: E501
                        re.MULTILINE)
     for match in regex.finditer(results.stdout_output):
         cpu_usr += float(match.group(1))
@@ -3322,9 +3399,9 @@ def get_cpu_monitoring_stats():
         cpu_gnice += float(match.group(9))
         cpu_idle += float(match.group(10))
 
-    cpu_total = int(cpu_usr + cpu_nice + cpu_sys + cpu_iowait + \
-                    cpu_irq + cpu_soft + cpu_steal + cpu_guest + \
-                    cpu_gnice + cpu_idle)
+    cpu_total = int(cpu_usr + cpu_nice + cpu_sys + cpu_iowait
+                    + cpu_irq + cpu_soft + cpu_steal + cpu_guest
+                    + cpu_gnice + cpu_idle)
 
     ovs_cpu_total = ovs_cpu_pmd + ovs_cpu_revalidator + ovs_cpu_handler + \
         ovs_cpu_urcu + ovs_cpu_other
@@ -3355,14 +3432,13 @@ def get_cpu_monitoring_stats():
 # Get ovs version
 #
 def get_ovs_version():
-    result = dut_shell.dut_exec('sh -c "ovs-vswitchd --version"'.
-                                format(config.bridge_name),
+    result = dut_shell.dut_exec('sh -c "ovs-vswitchd --version"',
                                 die_on_error=True)
 
     m = re.search('.*([0-9]+.[0-9]+.[0-9]+).*',
                   str(result.output))
     if m:
-        return str(m.group(1))
+        return Version(str(m.group(1)))
 
     lprint("ERROR: Can't figure out ovs-vswitchd's version!")
     sys.exit(-1)
@@ -3403,7 +3479,7 @@ def get_vm_dpdk_version(vm):
     m = re.search('DPDK ([0-9]+\\.[0-9]+\\.[0-9]+)',
                   result.output)
     if m:
-        return str(m.group(1))
+        return Version(str(m.group(1)))
 
     lprint("ERROR: Can't figure out VMs DPDK version!")
     sys.exit(-1)
@@ -3419,8 +3495,7 @@ def get_ovs_datapath():
     m = re.search('(.+@.*{}):.*'.format(config.bridge_name),
                   output)
     if m:
-        m = re.search('(.+)@.*'.format(config.bridge_name),
-                      m.group(1))
+        m = re.search('(.+)@.*', m.group(1))
 
         return m.group(1)
 
@@ -3593,31 +3668,33 @@ def main():
     parser.add_argument("--debug-tester",
                         help="Enable tester debugging", action="store_true")
     parser.add_argument("--pmd-rxq-affinity", metavar="AFINITY",
-                        help="Set pmd-rxq-affinity when script configures bridges", type=str)
+                        help="Set pmd-rxq-affinity when script configures "
+                        "bridges", type=str)
     parser.add_argument("--dut-vm-address", metavar="ADDRESS",
-                        help="IP address of VM running on OpenVSwitch DUT", type=str,
-                        default=DEFAULT_DUT_VM_ADDRESS)
+                        help="IP address of VM running on OpenVSwitch DUT",
+                        type=str, default=DEFAULT_DUT_VM_ADDRESS)
     parser.add_argument("--dut-vm-nic-pci", metavar="PCI",
                         help="PCI address of VMs virtual NIC", type=str,
                         default=DEFAULT_DUT_VM_NIC_PCI_ADDRESS)
     parser.add_argument("--dut-vm-user", metavar="USER",
-                        help="User name of VM running on OpenVSwitch DUT", type=str,
-                        default=DEFAULT_DUT_VM_LOGIN_USER)
+                        help="User name of VM running on OpenVSwitch DUT",
+                        type=str, default=DEFAULT_DUT_VM_LOGIN_USER)
     parser.add_argument("--dut-vm-password", metavar="PASSWORD",
-                        help="User name of VM running on OpenVSwitch DUT", type=str,
-                        default=DEFAULT_DUT_VM_LOGIN_PASSWORD)
+                        help="User name of VM running on OpenVSwitch DUT",
+                        type=str, default=DEFAULT_DUT_VM_LOGIN_PASSWORD)
     parser.add_argument("--dut-vm-nic-queues", metavar="QUEUES",
-                        help="Number of VM nic queues (and cores) to allocate, default 1",
-                        type=int, default=1)
+                        help="Number of VM nic queues (and cores) to "
+                        "allocate, default 1", type=int, default=1)
     parser.add_argument("--dut-vm-nic-rxd", metavar="DESCRIPTORS",
-                        help="Number of VM nic receive descriptors, default 4096",
-                        type=int, default=4096)
+                        help="Number of VM nic receive descriptors, "
+                        "default 4096", type=int, default=4096)
     parser.add_argument("--dut-vm-nic-txd", metavar="DESCRIPTORS",
-                        help="Number of VM nic transmit descriptors, default 1024",
-                        type=int, default=1024)
+                        help="Number of VM nic transmit descriptors, "
+                        "default 1024", type=int, default=1024)
     # Removed VV test for now, as it needs non-upstream trafgen tool
     # parser.add_argument("--dut-second-vm-address", metavar="ADDRESS",
-    #                    help="IP address of second VM running on OpenVSwitch DUT", type=str,
+    #                    help="IP address of second VM running on "
+    #                    "OpenVSwitch DUT", type=str,
     #                    default=DEFAULT_DUT_SECOND_VM_ADDRESS)
     # parser.add_argument("--dut-second-vm-nic-pci", metavar="PCI",
     #                    help="PCI address of VMs virtual NIC", type=str,
@@ -3644,6 +3721,10 @@ def main():
     parser.add_argument("-p", "--physical-interface", metavar="DEVICE",
                         help="Physical interface", type=str,
                         default=DEFAULT_PHYSICAL_INTERFACE)
+    parser.add_argument("--payload-packet-random",
+                        help="Generate per packet random payload data "
+                        "instead of the default incremental bytes",
+                        action="store_true")
     parser.add_argument("--perf",
                         help="Enable perf profiling", action="store_true")
     parser.add_argument("--physical-interface-pci", metavar="PCI",
@@ -3759,27 +3840,30 @@ def main():
     #
     # Setting up the logger
     #
-    logging.basicConfig(format='%(asctime)s[%(levelname)-8.8s][%(name)s]: %(message)s',
-                        datefmt='%H:%M:%S',
-                        level=logging.ERROR,
-                        filename=config.logging)
+    logging.basicConfig(
+        format='%(asctime)s[%(levelname)-8.8s][%(name)s]: %(message)s',
+        datefmt='%H:%M:%S',
+        level=logging.ERROR,
+        filename=config.logging)
 
     slogger = logging.getLogger('script')
     slogger.setLevel(logging.INFO)
 
-    slogger.info("**********************************************************************")
+    slogger.info("*" * 69)
     slogger.info("** Starting \"%s\"", os.path.basename(__file__))
-    slogger.info("**********************************************************************")
+    slogger.info("*" * 69)
 
     #
     # Check some input parameters
     #
     if config.ovs_address == '':
-        lprint("ERROR: You must supply the OVS host address to use for testing!")
+        lprint(
+            "ERROR: You must supply the OVS host address to use for testing!")
         sys.exit(-1)
 
     if is_vm_needed_for_tests() and config.dut_vm_address == '':
-        lprint("ERROR: You must supply the DUT VM host address to use for testing!")
+        lprint("ERROR: You must supply the DUT VM host address to use for "
+               "testing!")
         sys.exit(-1)
 
     if config.dst_mac_address == '':
@@ -3808,7 +3892,8 @@ def main():
         sys.exit(-1)
 
     if not config.skip_vv_test and config.second_virtual_interface == '':
-        lprint("ERROR: You must supply a second virtual interface to use for testing!")
+        lprint("ERROR: You must supply a second virtual interface to use for "
+               "testing!")
         sys.exit(-1)
 
     if not config.skip_vv_test and config.dut_second_vm_address == '':
@@ -3817,35 +3902,43 @@ def main():
 
     if not config.skip_vv_test and \
        not check_pci_address_string(config.dut_second_vm_nic_pci):
-        lprint("ERROR: You must supply a valid PCI address for the second VMs NIC!")
+        lprint("ERROR: You must supply a valid PCI address for the second "
+               "VMs NIC!")
         sys.exit(-1)
 
     if config.dut_second_vm_address != '' and config.dut_vm_nic_pci == '':
-        lprint("ERROR: You must supply the second DUT VM host's NIC PCI address!")
+        lprint(
+            "ERROR: You must supply the second DUT VM host's NIC PCI address!")
         sys.exit(-1)
 
     if config.physical_interface == '':
-        lprint("ERROR: You must supply the physical interface to use for testing!")
+        lprint("ERROR: You must supply the physical interface to use for "
+               "testing!")
         sys.exit(-1)
 
     if config.run_pp_test and config.second_physical_interface == '':
-        lprint("ERROR: You must supply the second physical interface to use for testing!")
+        lprint("ERROR: You must supply the second physical interface to use "
+               "for testing!")
         sys.exit(-1)
 
     if is_vm_needed_for_tests() and config.virtual_interface == '':
-        lprint("ERROR: You must supply the virtual interface to use for testing!")
+        lprint(
+            "ERROR: You must supply the virtual interface to use for testing!")
         sys.exit(-1)
 
     if config.tester_address == '':
-        lprint("ERROR: You must supply the tester's address to use for testing!")
+        lprint(
+            "ERROR: You must supply the tester's address to use for testing!")
         sys.exit(-1)
 
     if config.tester_interface == '':
-        lprint("ERROR: You must supply the tester's interface to use for testing!")
+        lprint("ERROR: You must supply the tester's interface to use for "
+               "testing!")
         sys.exit(-1)
 
     if config.run_pp_test and config.second_tester_interface == '':
-        lprint("ERROR: You must supply the second tester's interface to use for testing!")
+        lprint("ERROR: You must supply the second tester's interface to use "
+               "for testing!")
         sys.exit(-1)
 
     if not tester_interface_valid(config.tester_interface):
@@ -3858,16 +3951,19 @@ def main():
         sys.exit(-1)
 
     if not check_list(config.stream_list, 1, 1000000):
-        lprint("ERROR: Invalid stream list, \"{}\", supplied!".format(config.stream_list))
+        lprint("ERROR: Invalid stream list, \"{}\", supplied!".format(
+            config.stream_list))
         sys.exit(-1)
 
-    if config.flow_type == 'L4-UDP' and not check_list(config.stream_list, 1, 65535):
+    if config.flow_type == 'L4-UDP' and not \
+       check_list(config.stream_list, 1, 65535):
         lprint("ERROR: Invalid stream list, \"{}\", supplied for L4 flows!".
                format(config.stream_list))
         sys.exit(-1)
 
     if not check_list(config.packet_list, 64, 9000):
-        lprint("ERROR: Invalid packet list, \"{}\", supplied!".format(config.packet_list))
+        lprint("ERROR: Invalid packet list, \"{}\", supplied!".format(
+            config.packet_list))
         sys.exit(-1)
 
     if config.run_time < 20 or config.run_time > 3600:
@@ -3904,7 +4000,8 @@ def main():
         #
         # ETH + IPv4 + UDP + VXLAN + ETH + IPv4 + UDP + ETH_CRC
         #
-        lprint("ERROR: Minimal packet size for the VXLAN test should be 96 bytes!")
+        lprint("ERROR: Minimal packet size for the VXLAN test should be 96 "
+               "bytes!")
         sys.exit(-1)
 
     if config.warm_up and (not config.skip_vv_test or config.run_vxlan_test):
@@ -3936,6 +4033,11 @@ def main():
                "--testpmd-startup-delay can not be AUTO(0)!")
         sys.exit(-1)
 
+    if config.tester_type == 'trex' and config.payload_packet_random:
+        lprint("ERROR: The trex tester type currently does not support "
+               "the --payload-packet-random option!")
+        sys.exit(-1)
+
     #
     # Dump settings if global debug is enabled
     #
@@ -3959,29 +4061,42 @@ def main():
     slogger.debug("  %-23.23s: %s", 'Perf tracing', config.perf)
     slogger.debug("  %-23.23s: %s", 'Tester Type', config.tester_type)
     slogger.debug("  %-23.23s: %s", 'Tester Address', config.tester_address)
-    slogger.debug("  %-23.23s: %s", 'Tester Interface', config.tester_interface)
-    slogger.debug("  %-23.23s: %s", 'Second Tester Interface', config.second_tester_interface)
+    slogger.debug("  %-23.23s: %s", 'Tester Interface',
+                  config.tester_interface)
+    slogger.debug("  %-23.23s: %s", 'Second Tester Interface',
+                  config.second_tester_interface)
     slogger.debug("  %-23.23s: %s", 'OVS Bridge Name', config.bridge_name)
     slogger.debug("  %-23.23s: %s", 'OVS DUT Address', config.ovs_address)
     slogger.debug("  %-23.23s: %s", 'OVS DUT Login', config.ovs_user)
-    slogger.debug("  %-23.23s: %s", 'OVS DUT VM1 Address', config.dut_vm_address)
-    slogger.debug("  %-23.23s: %s", 'OVS DUT VM2 Address', config.dut_second_vm_address)
-    slogger.debug("  %-23.23s: %s", 'OVS DUT VM1 PCI Address', config.dut_vm_nic_pci)
-    slogger.debug("  %-23.23s: %s", 'OVS DUT VM2 PCI Address', config.dut_second_vm_nic_pci)
+    slogger.debug("  %-23.23s: %s", 'OVS DUT VM1 Address',
+                  config.dut_vm_address)
+    slogger.debug("  %-23.23s: %s", 'OVS DUT VM2 Address',
+                  config.dut_second_vm_address)
+    slogger.debug("  %-23.23s: %s", 'OVS DUT VM1 PCI Address',
+                  config.dut_vm_nic_pci)
+    slogger.debug("  %-23.23s: %s", 'OVS DUT VM2 PCI Address',
+                  config.dut_second_vm_nic_pci)
     slogger.debug("  %-23.23s: %s", 'OVS VM Login', config.dut_vm_user)
-    slogger.debug("  %-23.23s: %s", 'OVS VM NIC queues', config.dut_vm_nic_queues)
+    slogger.debug("  %-23.23s: %s", 'OVS VM NIC queues',
+                  config.dut_vm_nic_queues)
     slogger.debug("  %-23.23s: %s", 'OVS VM NIC rxd', config.dut_vm_nic_rxd)
     slogger.debug("  %-23.23s: %s", 'OVS VM NIC txd', config.dut_vm_nic_txd)
-    slogger.debug("  %-23.23s: %s", 'Physical Interface', config.physical_interface)
-    slogger.debug("  %-23.23s: %u Gbit/s", 'Physical Int. Speed', config.physical_speed)
-    slogger.debug("  %-23.23s: %s", 'Virtual Interface', config.virtual_interface)
-    slogger.debug("  %-23.23s: %s", '2nd Virtual Interface', config.second_virtual_interface)
+    slogger.debug("  %-23.23s: %s", 'Physical Interface',
+                  config.physical_interface)
+    slogger.debug("  %-23.23s: %u Gbit/s", 'Physical Int. Speed',
+                  config.physical_speed)
+    slogger.debug("  %-23.23s: %s", 'Virtual Interface',
+                  config.virtual_interface)
+    slogger.debug("  %-23.23s: %s", '2nd Virtual Interface',
+                  config.second_virtual_interface)
     slogger.debug("  %-23.23s: %s", 'MAC swap', config.mac_swap)
     slogger.debug("  %-23.23s: %s", 'Source MAC', config.src_mac_address)
     slogger.debug("  %-23.23s: %s", 'Destination MAC', config.dst_mac_address)
     slogger.debug("  %-23.23s: %u seconds", 'Test run time', config.run_time)
-    slogger.debug("  %-23.23s: %s", 'Run with stream size\'s', config.stream_list)
-    slogger.debug("  %-23.23s: %s", 'Run with packet size\'s', config.packet_list)
+    slogger.debug("  %-23.23s: %s", 'Run with stream size\'s',
+                  config.stream_list)
+    slogger.debug("  %-23.23s: %s", 'Run with packet size\'s',
+                  config.packet_list)
     slogger.debug("  %-23.23s: %s", 'Skip PV test', config.skip_pv_test)
     slogger.debug("  %-23.23s: %s", 'Skip PVP test', config.skip_pvp_test)
     slogger.debug("  %-23.23s: %s", 'Skip VV test', config.skip_vv_test)
@@ -4175,7 +4290,8 @@ def main():
         if not config.skip_vv_test:
             for nr_of_streams in stream_size_list:
                 v2v_results[nr_of_streams], \
-                    v2v_cpu_results[nr_of_streams] = test_v2v(nr_of_streams, packet_size_list)
+                    v2v_cpu_results[nr_of_streams] = test_v2v(nr_of_streams,
+                                                              packet_size_list)
 
                 create_multiple_graph(packet_size_list, v2v_results,
                                       "Packet size", "Packets/second",
@@ -4191,7 +4307,8 @@ def main():
                                       format(get_flow_type_short()),
                                       "test_v2v_all_{}_ref".
                                       format(get_flow_type_name()),
-                                      [phy_speed], cpu_utilization=v2v_cpu_results)
+                                      [phy_speed],
+                                      cpu_utilization=v2v_cpu_results)
 
             csv_write_test_results(csv_handle, 'Virtual to Virtual test',
                                    stream_size_list, packet_size_list,
@@ -4200,7 +4317,8 @@ def main():
         if not config.skip_pv_test:
             for nr_of_streams in stream_size_list:
                 p2v_results[nr_of_streams], \
-                    p2v_cpu_results[nr_of_streams] = test_p2v(nr_of_streams, packet_size_list)
+                    p2v_cpu_results[nr_of_streams] = test_p2v(nr_of_streams,
+                                                              packet_size_list)
 
                 create_multiple_graph(packet_size_list, p2v_results,
                                       "Packet size", "Packets/second",
@@ -4213,8 +4331,10 @@ def main():
                                       "Packet size", "Packets/second",
                                       "Physical to Virtual, {}{}".
                                       format(flow_str, get_traffic_rate_str()),
-                                      "test_p2v_all_{}_ref".format(flow_file_str),
-                                      [phy_speed], cpu_utilization=p2v_cpu_results)
+                                      "test_p2v_all_{}_ref".format(
+                                          flow_file_str),
+                                      [phy_speed],
+                                      cpu_utilization=p2v_cpu_results)
 
             csv_write_test_results(csv_handle, 'Physical to Virtual test',
                                    stream_size_list, packet_size_list,
@@ -4223,22 +4343,25 @@ def main():
         if not config.skip_pvp_test:
             for nr_of_streams in stream_size_list:
                 p2v2p_results[nr_of_streams], \
-                    p2v2p_cpu_results[nr_of_streams] = test_p2v2p(nr_of_streams,
-                                                                  packet_size_list)
+                    p2v2p_cpu_results[nr_of_streams] = test_p2v2p(
+                        nr_of_streams, packet_size_list)
 
                 create_multiple_graph(packet_size_list, p2v2p_results,
                                       "Packet size", "Packets/second",
                                       "Physical to Virtual to Physical, {}{}".
                                       format(flow_str, get_traffic_rate_str()),
-                                      "test_p2v2p_all_{}".format(flow_file_str),
+                                      "test_p2v2p_all_{}".format(
+                                          flow_file_str),
                                       None, cpu_utilization=p2v2p_cpu_results)
 
                 create_multiple_graph(packet_size_list, p2v2p_results,
                                       "Packet size", "Packets/second",
                                       "Physical to Virtual to Physical, {}{}".
                                       format(flow_str, get_traffic_rate_str()),
-                                      "test_p2v2p_all_{}_ref".format(flow_file_str),
-                                      [phy_speed], cpu_utilization=p2v2p_cpu_results)
+                                      "test_p2v2p_all_{}_ref".format(
+                                          flow_file_str),
+                                      [phy_speed],
+                                      cpu_utilization=p2v2p_cpu_results)
 
             csv_write_test_results(csv_handle,
                                    'Physical to Virtual to Physical test',
@@ -4248,7 +4371,8 @@ def main():
         if config.run_pp_test:
             for nr_of_streams in stream_size_list:
                 p2p_results[nr_of_streams], \
-                    p2p_cpu_results[nr_of_streams] = test_p2p(nr_of_streams, packet_size_list)
+                    p2p_cpu_results[nr_of_streams] = test_p2p(nr_of_streams,
+                                                              packet_size_list)
 
                 create_multiple_graph(packet_size_list, p2p_results,
                                       "Packet size", "Packets/second",
@@ -4261,8 +4385,10 @@ def main():
                                       "Packet size", "Packets/second",
                                       "Physical to Physical, {}{}".
                                       format(flow_str, get_traffic_rate_str()),
-                                      "test_p2p_all_{}_ref".format(flow_file_str),
-                                      [phy_speed], cpu_utilization=p2p_cpu_results)
+                                      "test_p2p_all_{}_ref".format(
+                                          flow_file_str),
+                                      [phy_speed],
+                                      cpu_utilization=p2p_cpu_results)
 
             csv_write_test_results(csv_handle, 'Physical to Physical test',
                                    stream_size_list, packet_size_list,
@@ -4271,7 +4397,8 @@ def main():
         if config.run_p_test:
             for nr_of_streams in stream_size_list:
                 p_results[nr_of_streams], \
-                    p_cpu_results[nr_of_streams] = test_p(nr_of_streams, packet_size_list)
+                    p_cpu_results[nr_of_streams] = test_p(nr_of_streams,
+                                                          packet_size_list)
 
                 create_multiple_graph(packet_size_list, p_results,
                                       "Packet size", "Packets/second",
@@ -4284,8 +4411,10 @@ def main():
                                       "Packet size", "Packets/second",
                                       "Physical loopback, {}{}".
                                       format(flow_str, get_traffic_rate_str()),
-                                      "test_p_all_{}_ref".format(flow_file_str),
-                                      [phy_speed], cpu_utilization=p_cpu_results)
+                                      "test_p_all_{}_ref".format(
+                                          flow_file_str),
+                                      [phy_speed],
+                                      cpu_utilization=p_cpu_results)
 
             csv_write_test_results(csv_handle, 'Physical loopback test',
                                    stream_size_list, packet_size_list,
@@ -4305,22 +4434,25 @@ def main():
 
             for nr_of_streams in stream_size_list:
                 vxlan_results[nr_of_streams], \
-                    vxlan_cpu_results[nr_of_streams] = test_vxlan(nr_of_streams,
-                                                                  packet_size_list)
+                    vxlan_cpu_results[nr_of_streams] = test_vxlan(
+                        nr_of_streams, packet_size_list)
 
                 create_multiple_graph(packet_size_list, vxlan_results,
                                       "Packet size", "Packets/second",
                                       "VXLAN Tunnel, {}{}".
                                       format(flow_str, get_traffic_rate_str()),
-                                      "test_vxlan_all_{}".format(flow_file_str),
+                                      "test_vxlan_all_{}".format(
+                                          flow_file_str),
                                       None, cpu_utilization=vxlan_cpu_results)
 
                 create_multiple_graph(packet_size_list, vxlan_results,
                                       "Packet size", "Packets/second",
                                       "VXLAN Tunnel, {}{}".
                                       format(flow_str, get_traffic_rate_str()),
-                                      "test_vxlan_all_{}_ref".format(flow_file_str),
-                                      [phy_speed], cpu_utilization=vxlan_cpu_results)
+                                      "test_vxlan_all_{}_ref".format(
+                                          flow_file_str),
+                                      [phy_speed],
+                                      cpu_utilization=vxlan_cpu_results)
 
             csv_write_test_results(csv_handle, 'VXLAN Tunnel',
                                    stream_size_list, packet_size_list,

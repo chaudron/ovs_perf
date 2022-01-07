@@ -216,11 +216,9 @@ class _TRexPort(TrafficGeneratorPort):
             elif traffic_flows == TrafficFlowType.l3_ipv4:
 
                 src_end = str(netaddr.IPAddress(
-                    int(netaddr.IPAddress('1.0.0.0')) +
-                    nr_of_flows - 1))
+                    int(netaddr.IPAddress('1.0.0.0')) + nr_of_flows - 1))
                 dst_end = str(netaddr.IPAddress(
-                    int(netaddr.IPAddress('2.0.0.0')) +
-                    nr_of_flows - 1))
+                    int(netaddr.IPAddress('2.0.0.0')) + nr_of_flows - 1))
 
                 vm = [
                     # Source IPv4 address
@@ -239,11 +237,9 @@ class _TRexPort(TrafficGeneratorPort):
             elif traffic_flows == TrafficFlowType.nfv_mobile:
 
                 src_end = str(netaddr.IPAddress(
-                    int(netaddr.IPAddress('1.0.0.0')) +
-                    nr_of_flows - 1))
+                    int(netaddr.IPAddress('1.0.0.0')) + nr_of_flows - 1))
                 dst_end = str(netaddr.IPAddress(
-                    int(netaddr.IPAddress('2.0.0.0')) +
-                    nr_of_flows - 1))
+                    int(netaddr.IPAddress('2.0.0.0')) + nr_of_flows - 1))
 
                 vm = [
                     # Source MAC address
@@ -275,7 +271,8 @@ class _TRexPort(TrafficGeneratorPort):
                 ]
 
             else:
-                raise ValueError("Unsupported traffic type for T-Rex tester!!!")
+                raise ValueError(
+                    "Unsupported traffic type for T-Rex tester!!!")
 
             if traffic_flows == TrafficFlowType.nfv_mobile:
                 stream_percentage = flow_percentage / 2
@@ -289,7 +286,8 @@ class _TRexPort(TrafficGeneratorPort):
             trex_packet = STLPktBuilder(pkt=packet, vm=vm)
 
             trex_stream = STLStream(packet=trex_packet,
-                                    mode=STLTXCont(percentage=stream_percentage))
+                                    mode=STLTXCont(
+                                        percentage=stream_percentage))
 
             self.__trex_client.add_streams(trex_stream,
                                            ports=[self.__trex_port])
@@ -319,19 +317,15 @@ class _TRexPort(TrafficGeneratorPort):
                     flow_start = start_stream_id * 0x10000
 
                     src_start = str(netaddr.IPAddress(
-                        int(netaddr.IPAddress('1.0.0.0')) +
-                        flow_start))
+                        int(netaddr.IPAddress('1.0.0.0')) + flow_start))
                     src_end = str(netaddr.IPAddress(
-                        int(netaddr.IPAddress('1.0.0.0')) +
-                        flow_start +
-                        alternate_flows - 1))
+                        int(netaddr.IPAddress('1.0.0.0')) + flow_start
+                        + alternate_flows - 1))
                     dst_start = str(netaddr.IPAddress(
-                        int(netaddr.IPAddress('2.0.0.0')) +
-                        flow_start))
+                        int(netaddr.IPAddress('2.0.0.0')) + flow_start))
                     dst_end = str(netaddr.IPAddress(
-                        int(netaddr.IPAddress('2.0.0.0')) +
-                        flow_start +
-                        alternate_flows - 1))
+                        int(netaddr.IPAddress('2.0.0.0')) + flow_start
+                        + alternate_flows - 1))
 
                     vm = [
                         # Source MAC address
@@ -364,15 +358,17 @@ class _TRexPort(TrafficGeneratorPort):
                     trex_packet = STLPktBuilder(pkt=packet, vm=vm)
 
                     stream = STLStream(packet=trex_packet,
-                                       mode=STLTXCont(percentage=stream_percentage),
+                                       mode=STLTXCont(
+                                           percentage=stream_percentage),
                                        start_paused=False
                                        if alternate_flow_sets == 0 else True)
 
                     self.__alternate_stream_sets.append(
-                        self.__trex_client.add_streams(stream,
-                                                       ports=[self.__trex_port]))
+                        self.__trex_client.add_streams(
+                            stream, ports=[self.__trex_port]))
 
-                    start_stream_id += self._div_round_up(alternate_flows, 0x10000)
+                    start_stream_id += self._div_round_up(alternate_flows,
+                                                          0x10000)
 
             self.__traffic_flows = traffic_flows
             return True
@@ -446,7 +442,8 @@ class _TRexPort(TrafficGeneratorPort):
             self.__traffic_flows = traffic_flows
             return True
         else:
-            raise ValueError("Unsupported traffic flow passed for T-Rex tester!")
+            raise ValueError(
+                "Unsupported traffic flow passed for T-Rex tester!")
 
         self.__traffic_flows = TrafficFlowType.none
         return False
@@ -594,10 +591,8 @@ class TRex(TrafficGeneratorChassis):
     def configure_traffic_stream(self, port_name, traffic_flows,
                                  nr_of_flows, packet_size, **kwargs):
         if self._verify_port_action(port_name):
-            return self.port_data[port_name].configure_traffic_stream(traffic_flows,
-                                                                      nr_of_flows,
-                                                                      packet_size,
-                                                                      **kwargs)
+            return self.port_data[port_name].configure_traffic_stream(
+                traffic_flows, nr_of_flows, packet_size, **kwargs)
         return False
 
     def next_traffic_stream(self, port_name):

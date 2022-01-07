@@ -50,10 +50,10 @@ from enum import Enum
 # Type of traffic generator
 #
 class TrafficGeneratorType(Enum):
-    xena           = 1
-    trex           = 2
-    trafen         = 3
-    moongen        = 4
+    xena = 1
+    trex = 2
+    trafen = 3
+    moongen = 4
     trafgen_dut_vm = 5
 
     @staticmethod
