@@ -373,14 +373,16 @@ def test_p2v2p_single_packet_size(nr_of_flows, packet_size, **kwargs):
 
     ##################################################
     lprint("  * Initializing packet generation...")
-    tester.configure_traffic_stream(config.tester_interface,
-                                    get_traffic_generator_flow(),
-                                    nr_of_flows, packet_size,
-                                    traffic_dst_mac=config.dst_mac_address,
-                                    traffic_src_mac=config.src_mac_address,
-                                    percentage=1000000 - decrease_rate,
-                                    random_payload=config.payload_packet_random
-                                    )
+    tester.configure_traffic_stream(
+        config.tester_interface,
+        get_traffic_generator_flow(),
+        nr_of_flows, packet_size,
+        traffic_dst_mac=config.dst_mac_address,
+        traffic_src_mac=config.src_mac_address,
+        percentage=1000000 - decrease_rate,
+        random_payload=config.payload_packet_random,
+        latency_measurement=config.latency_measurement
+    )
 
     ##################################################
     if config.warm_up:
@@ -480,6 +482,12 @@ def test_p2v2p_single_packet_size(nr_of_flows, packet_size, **kwargs):
     packets_rx = full_rx_stats[sorted(
         full_rx_stats.keys())[-1]]['pr_total']['packets']
 
+    if config.latency_measurement:
+        latency = full_rx_stats[sorted(
+            full_rx_stats.keys())[-1]]['pr_tpldlatency']['1']
+        jitter = full_rx_stats[sorted(
+            full_rx_stats.keys())[-1]]['pr_pldjitter']['1']
+
     lprint("    - Packets send by Tester      : {:-20,}".format(packets_tx))
 
     lprint("    - Packets received by physical: {:-20,} [Lost {:,}, Drop "
@@ -501,7 +509,13 @@ def test_p2v2p_single_packet_size(nr_of_flows, packet_size, **kwargs):
 
     rx_pkts_sec = get_packets_per_second_from_traffic_generator_rx_stats(
         full_rx_stats)
+
     lprint("  ! Result, average: {:,} pps".format(rx_pkts_sec))
+    if config.latency_measurement:
+        lprint("  ! Result, latency [min/max/avg]: {:,} / {:,} / {:,} ns".
+               format(latency["min"], latency["max"], latency["avg"]))
+        lprint("  ! Result, jitter  [min/max/avg]: {:,} / {:,} / {:,} ns".
+               format(jitter["min"], jitter["max"], jitter["avg"]))
 
     ##################################################
     lprint("  * Restoring state for next test...")
@@ -521,6 +535,10 @@ def test_p2v2p_single_packet_size(nr_of_flows, packet_size, **kwargs):
     results["rx_packets_second"] = rx_pkts_sec
     results["total_tx_pkts"] = packets_tx
     results["total_rx_pkts"] = packets_rx
+    if config.latency_measurement:
+        results["latency"] = latency
+        results["jitter"] = jitter
+
     return results
 
 
@@ -531,6 +549,8 @@ def test_p2v2p(nr_of_flows, packet_sizes):
 
     p2v2p_results = list()
     cpu_results = list()
+    latency_results = None
+    jitter_results = None
 
     for packet_size in packet_sizes:
         results = test_p2v2p_single_packet_size(nr_of_flows, packet_size,
@@ -539,6 +559,15 @@ def test_p2v2p(nr_of_flows, packet_sizes):
 
         cpu_results.append(results["cpu_stats"])
         p2v2p_results.append(results["rx_packets_second"])
+
+        if "latency" in results:
+            if latency_results is None:
+                latency_results = list()
+            latency_results.append(results["latency"])
+        if "jitter" in results:
+            if jitter_results is None:
+                jitter_results = list()
+            jitter_results.append(results["jitter"])
 
     create_single_graph(packet_sizes, p2v2p_results,
                         "Packet size", "Packets/second",
@@ -550,7 +579,7 @@ def test_p2v2p(nr_of_flows, packet_sizes):
                         phy_speed,
                         cpu_utilization=cpu_results)
 
-    return p2v2p_results, cpu_results
+    return p2v2p_results, cpu_results, latency_results, jitter_results
 
 
 #
@@ -583,7 +612,9 @@ def test_p2v(nr_of_flows, packet_sizes):
             traffic_dst_mac=config.dst_mac_address,
             traffic_src_mac=config.src_mac_address,
             percentage=config.traffic_rate * 10000,
-            random_payload=config.payload_packet_random)
+            random_payload=config.payload_packet_random,
+            latency_measurement=config.latency_measurement
+        )
 
         ##################################################
         if config.warm_up:
@@ -703,6 +734,13 @@ def test_p2p(nr_of_flows, packet_sizes):
     p2p_results = list()
     cpu_results = list()
 
+    if config.latency_measurement:
+        latency_results = list()
+        jitter_results = list()
+    else:
+        latency_results = None
+        jitter_results = None
+
     for packet_size in packet_sizes:
 
         ##################################################
@@ -726,7 +764,9 @@ def test_p2p(nr_of_flows, packet_sizes):
             traffic_dst_mac=config.dst_mac_address,
             traffic_src_mac=config.src_mac_address,
             percentage=config.traffic_rate * 10000,
-            random_payload=config.payload_packet_random)
+            random_payload=config.payload_packet_random,
+            latency_measurement=config.latency_measurement
+        )
 
         ##################################################
         if config.warm_up:
@@ -801,6 +841,12 @@ def test_p2p(nr_of_flows, packet_sizes):
         packets_rx = full_rx_stats[sorted(
             full_rx_stats.keys())[-1]]['pr_total']['packets']
 
+        if config.latency_measurement:
+            latency = full_rx_stats[sorted(
+                full_rx_stats.keys())[-1]]['pr_tpldlatency']['1']
+            jitter = full_rx_stats[sorted(
+                full_rx_stats.keys())[-1]]['pr_pldjitter']['1']
+
         lprint("    - Packets send by Tester         : {:-20,}".format(
             packets_tx))
 
@@ -820,6 +866,15 @@ def test_p2p(nr_of_flows, packet_sizes):
 
         p2p_results.append(rx_pkts_sec)
         cpu_results.append(get_cpu_monitoring_stats())
+
+        if config.latency_measurement:
+            lprint("  ! Result, latency [min/max/avg]: {:,} / {:,} / {:,} ns".
+                   format(latency["min"], latency["max"], latency["avg"]))
+            lprint("  ! Result, jitter  [min/max/avg]: {:,} / {:,} / {:,} ns".
+                   format(jitter["min"], jitter["max"], jitter["avg"]))
+
+            latency_results.append(latency)
+            jitter_results.append(jitter)
 
         ##################################################
         lprint("  * Restoring state for next test...")
@@ -843,7 +898,7 @@ def test_p2p(nr_of_flows, packet_sizes):
                         format(nr_of_flows, get_flow_type_name()),
                         phy_speed, cpu_utilization=cpu_results)
 
-    return p2p_results, cpu_results
+    return p2p_results, cpu_results, latency_results, jitter_results
 
 
 #
@@ -872,14 +927,16 @@ def test_p_single_packet_size(nr_of_flows, packet_size, **kwargs):
 
     ##################################################
     lprint("  * Initializing packet generation...")
-    tester.configure_traffic_stream(config.tester_interface,
-                                    get_traffic_generator_flow(),
-                                    nr_of_flows, packet_size,
-                                    traffic_dst_mac=config.dst_mac_address,
-                                    traffic_src_mac=config.src_mac_address,
-                                    percentage=1000000 - decrease_rate,
-                                    random_payload=config.payload_packet_random
-                                    )
+    tester.configure_traffic_stream(
+        config.tester_interface,
+        get_traffic_generator_flow(),
+        nr_of_flows, packet_size,
+        traffic_dst_mac=config.dst_mac_address,
+        traffic_src_mac=config.src_mac_address,
+        percentage=1000000 - decrease_rate,
+        random_payload=config.payload_packet_random,
+        latency_measurement=config.latency_measurement
+    )
 
     ##################################################
     if config.warm_up:
@@ -946,6 +1003,12 @@ def test_p_single_packet_size(nr_of_flows, packet_size, **kwargs):
     packets_rx = full_rx_stats[sorted(
         full_rx_stats.keys())[-1]]['pr_total']['packets']
 
+    if config.latency_measurement:
+        latency = full_rx_stats[sorted(
+            full_rx_stats.keys())[-1]]['pr_tpldlatency']['1']
+        jitter = full_rx_stats[sorted(
+            full_rx_stats.keys())[-1]]['pr_pldjitter']['1']
+
     lprint("    - Packets send by Tester      : {:-20,}".format(packets_tx))
 
     lprint("    - Packets received by physical: {:-20,} [Lost {:,}, Drop "
@@ -960,6 +1023,11 @@ def test_p_single_packet_size(nr_of_flows, packet_size, **kwargs):
     rx_pkts_sec = get_packets_per_second_from_traffic_generator_rx_stats(
         full_rx_stats)
     lprint("  ! Result, average: {:,} pps".format(rx_pkts_sec))
+    if config.latency_measurement:
+        lprint("  ! Result, latency [min/max/avg]: {:,} / {:,} / {:,} ns".
+               format(latency["min"], latency["max"], latency["avg"]))
+        lprint("  ! Result, jitter  [min/max/avg]: {:,} / {:,} / {:,} ns".
+               format(jitter["min"], jitter["max"], jitter["avg"]))
 
     ##################################################
     lprint("  * Restoring state for next test...")
@@ -979,6 +1047,10 @@ def test_p_single_packet_size(nr_of_flows, packet_size, **kwargs):
     results["rx_packets_second"] = rx_pkts_sec
     results["total_tx_pkts"] = packets_tx
     results["total_rx_pkts"] = packets_rx
+    if config.latency_measurement:
+        results["latency"] = latency
+        results["jitter"] = jitter
+
     return results
 
 
@@ -989,6 +1061,8 @@ def test_p(nr_of_flows, packet_sizes):
 
     p_results = list()
     cpu_results = list()
+    latency_results = None
+    jitter_results = None
 
     for packet_size in packet_sizes:
         results = test_p_single_packet_size(nr_of_flows, packet_size,
@@ -997,6 +1071,15 @@ def test_p(nr_of_flows, packet_sizes):
 
         cpu_results.append(results["cpu_stats"])
         p_results.append(results["rx_packets_second"])
+
+        if "latency" in results:
+            if latency_results is None:
+                latency_results = list()
+            latency_results.append(results["latency"])
+        if "jitter" in results:
+            if jitter_results is None:
+                jitter_results = list()
+            jitter_results.append(results["jitter"])
 
     create_single_graph(packet_sizes, p_results,
                         "Packet size", "Packets/second",
@@ -1008,7 +1091,7 @@ def test_p(nr_of_flows, packet_sizes):
                         phy_speed,
                         cpu_utilization=cpu_results)
 
-    return p_results, cpu_results
+    return p_results, cpu_results, latency_results, jitter_results
 
 
 #
@@ -1052,13 +1135,26 @@ def test_p2v2p_zero_loss(stream_size_list, packet_size_list, **kwargs):
                                   results[index]),
                               test_results[nr_of_streams][packet_size]
                               ["rx_packets_second"]))
+                if "latency" in results[index]:
+                    lprint("  ! Zero pkt loss latency [min/max/avg]: "
+                           "{:,} / {:,} / {:,} ns".format(
+                               results[index]["latency"]["min"],
+                               results[index]["latency"]["max"],
+                               results[index]["latency"]["avg"]))
+                if "jitter" in results[index]:
+                    lprint("  ! Zero pkt loss jitter  [min/max/avg]: "
+                           "{:,} / {:,} / {:,} ns".format(
+                               results[index]["jitter"]["min"],
+                               results[index]["jitter"]["max"],
+                               results[index]["jitter"]["avg"]))
             else:
                 test_results[nr_of_streams][packet_size] = results[
                     min(results)]
                 lprint("  ! Zero pkt loss for {} bytes, NOT reached!!".
                        format(packet_size))
 
-        pvp0_results, pvp0_cpu_results, pvp0_traffic_rate, pvp0_loss_rate \
+        pvp0_results, pvp0_cpu_results, pvp0_traffic_rate, pvp0_loss_rate, \
+            pvp0_latency, pvp0_jitter \
             = get_result_sets_from_zero_loss_results(test_results)
 
         #
@@ -1103,7 +1199,8 @@ def test_p2v2p_zero_loss(stream_size_list, packet_size_list, **kwargs):
             'Zero Loss Physical to Virtual to Physical test',
             stream_size_list, packet_size_list,
             pvp0_results, pvp0_cpu_results, loss_rate=pvp0_loss_rate,
-            traffic_rate=pvp0_traffic_rate)
+            traffic_rate=pvp0_traffic_rate,
+            latency=pvp0_latency, jitter=pvp0_jitter)
 
 
 #
@@ -1173,13 +1270,26 @@ def test_p_zero_loss(stream_size_list, packet_size_list, **kwargs):
                                   results[index]),
                               test_results[nr_of_streams][packet_size]
                               ["rx_packets_second"]))
+                if "latency" in results[index]:
+                    lprint("  ! Zero pkt loss latency [min/max/avg]: "
+                           "{:,} / {:,} / {:,} ns".format(
+                               results[index]["latency"]["min"],
+                               results[index]["latency"]["max"],
+                               results[index]["latency"]["avg"]))
+                if "jitter" in results[index]:
+                    lprint("  ! Zero pkt loss jitter  [min/max/avg]: "
+                           "{:,} / {:,} / {:,} ns".format(
+                               results[index]["jitter"]["min"],
+                               results[index]["jitter"]["max"],
+                               results[index]["jitter"]["avg"]))
             else:
                 test_results[nr_of_streams][packet_size] = \
                     results[min(results)]
                 lprint("  ! Zero pkt loss for {} bytes, NOT reached!!".
                        format(packet_size))
 
-        p0_results, p0_cpu_results, p0_traffic_rate, p0_loss_rate \
+        p0_results, p0_cpu_results, p0_traffic_rate, p0_loss_rate, \
+            p0_latency, p0_jitter \
             = get_result_sets_from_zero_loss_results(test_results)
 
         #
@@ -1224,7 +1334,8 @@ def test_p_zero_loss(stream_size_list, packet_size_list, **kwargs):
             'Zero Loss Physical Loopback test',
             stream_size_list, packet_size_list,
             p0_results, p0_cpu_results, loss_rate=p0_loss_rate,
-            traffic_rate=p0_traffic_rate)
+            traffic_rate=p0_traffic_rate,
+            latency=p0_latency, jitter=p0_jitter)
 
 
 #
@@ -1287,7 +1398,9 @@ def test_vxlan(nr_of_flows, packet_sizes):
             tunnel_dst_mac=tunnel_dst_mac,
             traffic_dst_mac=config.dst_mac_address,
             percentage=config.traffic_rate * 10000,
-            random_payload=config.payload_packet_random)
+            random_payload=config.payload_packet_random,
+            latency_measurement=config.latency_measurement
+        )
 
         ##################################################
         lprint("  * Clear all statistics...")
@@ -3154,6 +3267,8 @@ def csv_write_test_results(csv_handle, test_name, flow_size_list,
 
     loss_rate = kwargs.pop("loss_rate", None)
     traffic_rate = kwargs.pop("traffic_rate", None)
+    latency = kwargs.pop("latency", None)
+    jitter = kwargs.pop("jitter", None)
 
     if config.flow_type == 'L2':
         flow_type = ", L2 flows"
@@ -3169,11 +3284,26 @@ def csv_write_test_results(csv_handle, test_name, flow_size_list,
     elif config.flow_rule_type == 'port':
         flow_type += "[port redirect]"
 
+    if latency is not None:
+        for flow in flow_size_list:
+            if latency[flow] is None or \
+               len(latency[flow]) != len(packet_size_list):
+                latency = None
+                break
+
+    if jitter is not None:
+        for flow in flow_size_list:
+            if jitter[flow] is None or \
+               len(jitter[flow]) != len(packet_size_list):
+                jitter = None
+                break
+
     csv_handle.writerow([test_name + flow_type])
 
     if len(test_results) > 0:
         csv_handle.writerow(['', 'Packet size'])
-        if loss_rate is not None or traffic_rate is not None:
+        if loss_rate is not None or traffic_rate is not None or \
+           latency is not None or jitter is not None:
 
             lables = ['Receive rate']
             packet_size_lables = []
@@ -3185,6 +3315,22 @@ def csv_write_test_results(csv_handle, test_name, flow_size_list,
 
             if loss_rate is not None:
                 lables.append('Loss rate')
+                l1.append('')
+
+            if latency is not None:
+                lables.append('Latency Min')
+                lables.append('Latency Max')
+                lables.append('Latency Avg')
+                l1.append('')
+                l1.append('')
+                l1.append('')
+
+            if jitter is not None:
+                lables.append('Jitter Min')
+                lables.append('Jitter Max')
+                lables.append('Jitter Avg')
+                l1.append('')
+                l1.append('')
                 l1.append('')
 
             for pkt in packet_size_list:
@@ -3204,6 +3350,14 @@ def csv_write_test_results(csv_handle, test_name, flow_size_list,
                     results.append(traffic_rate[flow][i])
                 if loss_rate is not None:
                     results.append(loss_rate[flow][i])
+                if latency is not None:
+                    results.append(latency[flow][i]["min"])
+                    results.append(latency[flow][i]["max"])
+                    results.append(latency[flow][i]["avg"])
+                if jitter is not None:
+                    results.append(jitter[flow][i]["min"])
+                    results.append(jitter[flow][i]["max"])
+                    results.append(jitter[flow][i]["avg"])
 
             csv_handle.writerow(results)
 
@@ -3589,13 +3743,18 @@ def get_result_sets_from_zero_loss_results(results):
     cpu_results = dict()
     traffic_rate_results = dict()
     loss_rate_results = dict()
+    latency = dict()
+    jitter = dict()
+
     for nr_of_flows, per_pkt_results in results.items():
         test_results[nr_of_flows] = list()
         cpu_results[nr_of_flows] = list()
         traffic_rate_results[nr_of_flows] = list()
         loss_rate_results[nr_of_flows] = list()
-        for pkt_size in natsorted(list(per_pkt_results.keys())):
+        latency[nr_of_flows] = list()
+        jitter[nr_of_flows] = list()
 
+        for pkt_size in natsorted(list(per_pkt_results.keys())):
             test_results[nr_of_flows].append(
                 per_pkt_results[pkt_size]["rx_packets_second"])
             cpu_results[nr_of_flows].append(
@@ -3605,7 +3764,15 @@ def get_result_sets_from_zero_loss_results(results):
             loss_rate_results[nr_of_flows].append(
                 calc_loss_percentage(per_pkt_results[pkt_size]))
 
-    return test_results, cpu_results, traffic_rate_results, loss_rate_results
+            if "latency" in per_pkt_results[pkt_size]:
+                latency[nr_of_flows].append(
+                    per_pkt_results[pkt_size]["latency"])
+
+            if "jitter" in per_pkt_results[pkt_size]:
+                jitter[nr_of_flows].append(per_pkt_results[pkt_size]["jitter"])
+
+    return test_results, cpu_results, traffic_rate_results, \
+        loss_rate_results, latency, jitter
 
 
 #
@@ -3701,6 +3868,9 @@ def main():
                         choices=flow_types, default='L3')
     parser.add_argument("-g", "--gui",
                         help="Show graph GUI", action="store_true")
+    parser.add_argument("--latency-measurement",
+                        help="Enable latency measurement, if supported",
+                        action="store_true")
     parser.add_argument("--no-bridge-config",
                         help="Do not configure OVS", action="store_true")
     parser.add_argument("-o", "--ovs-address", metavar="ADDRESS",
@@ -4032,6 +4202,11 @@ def main():
                "the --payload-packet-random option!")
         sys.exit(-1)
 
+    if config.tester_type == 'trex' and config.latency_measurement:
+        lprint("ERROR: The trex tester type currently does not support "
+               "the --latency-measurement option!")
+        sys.exit(-1)
+
     #
     # Dump settings if global debug is enabled
     #
@@ -4276,10 +4451,16 @@ def main():
         p2v_cpu_results = dict()
         p2p_results = dict()
         p2p_cpu_results = dict()
+        p2p_latency = dict()
+        p2p_jitter = dict()
         p2v2p_results = dict()
         p2v2p_cpu_results = dict()
+        p2v2p_latency = dict()
+        p2v2p_jitter = dict()
         p_results = dict()
         p_cpu_results = dict()
+        p_latency = dict()
+        p_jitter = dict()
 
         if not config.skip_vv_test:
             for nr_of_streams in stream_size_list:
@@ -4337,7 +4518,9 @@ def main():
         if not config.skip_pvp_test:
             for nr_of_streams in stream_size_list:
                 p2v2p_results[nr_of_streams], \
-                    p2v2p_cpu_results[nr_of_streams] = test_p2v2p(
+                    p2v2p_cpu_results[nr_of_streams], \
+                    p2v2p_latency[nr_of_streams], \
+                    p2v2p_jitter[nr_of_streams] = test_p2v2p(
                         nr_of_streams, packet_size_list)
 
                 create_multiple_graph(packet_size_list, p2v2p_results,
@@ -4360,13 +4543,16 @@ def main():
             csv_write_test_results(csv_handle,
                                    'Physical to Virtual to Physical test',
                                    stream_size_list, packet_size_list,
-                                   p2v2p_results, p2v2p_cpu_results)
+                                   p2v2p_results, p2v2p_cpu_results,
+                                   latency=p2v2p_latency, jitter=p2v2p_jitter)
 
         if config.run_pp_test:
             for nr_of_streams in stream_size_list:
                 p2p_results[nr_of_streams], \
-                    p2p_cpu_results[nr_of_streams] = test_p2p(nr_of_streams,
-                                                              packet_size_list)
+                    p2p_cpu_results[nr_of_streams], \
+                    p2p_latency[nr_of_streams], \
+                    p2p_jitter[nr_of_streams] = test_p2p(nr_of_streams,
+                                                         packet_size_list)
 
                 create_multiple_graph(packet_size_list, p2p_results,
                                       "Packet size", "Packets/second",
@@ -4386,13 +4572,16 @@ def main():
 
             csv_write_test_results(csv_handle, 'Physical to Physical test',
                                    stream_size_list, packet_size_list,
-                                   p2p_results, p2p_cpu_results)
+                                   p2p_results, p2p_cpu_results,
+                                   latency=p2p_latency, jitter=p2p_jitter)
 
         if config.run_p_test:
             for nr_of_streams in stream_size_list:
                 p_results[nr_of_streams], \
-                    p_cpu_results[nr_of_streams] = test_p(nr_of_streams,
-                                                          packet_size_list)
+                    p_cpu_results[nr_of_streams], \
+                    p_latency[nr_of_streams], \
+                    p_jitter[nr_of_streams] = test_p(nr_of_streams,
+                                                     packet_size_list)
 
                 create_multiple_graph(packet_size_list, p_results,
                                       "Packet size", "Packets/second",
@@ -4412,7 +4601,8 @@ def main():
 
             csv_write_test_results(csv_handle, 'Physical loopback test',
                                    stream_size_list, packet_size_list,
-                                   p_results, p_cpu_results)
+                                   p_results, p_cpu_results,
+                                   latency=p_latency, jitter=p_jitter)
 
         if config.run_vxlan_test:
             if not config.no_bridge_config:

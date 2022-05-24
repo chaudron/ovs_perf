@@ -124,6 +124,7 @@ class _XenaNetworksPort(TrafficGeneratorPort):
         traffic_dst_mac = kwargs.pop("traffic_dst_mac", '00:00:02:00:00:00')
         traffic_src_mac = kwargs.pop("traffic_src_mac", '00:00:01:00:00:00')
         random_payload = kwargs.pop("random_payload", False)
+        latency_measurement = kwargs.pop("latency_measurement", False)
 
         if traffic_flows == TrafficFlowType.l2_mac:
             src_mac = (self._mac_2_int(traffic_src_mac) & 0xffffff000000) + \
@@ -192,7 +193,10 @@ class _XenaNetworksPort(TrafficGeneratorPort):
         else:
             new_stream.set_packet_payload_incrementing('0x00')
         new_stream.set_packet_protocol('ETHERNET', 'IP')
-        new_stream.disable_test_payload_id()
+        if latency_measurement:
+            new_stream.set_test_payload_id(stream_id)
+        else:
+            new_stream.disable_test_payload_id()
         new_stream.set_frame_csum_on()
 
         if traffic_flows == TrafficFlowType.l2_mac:
@@ -401,7 +405,9 @@ class _XenaNetworksPort(TrafficGeneratorPort):
                                 stream_percentage,
                                 suppress,
                                 random_payload=kwargs.pop(
-                                    "random_payload", False)
+                                    "random_payload", False),
+                                latency_measurement=kwargs.pop(
+                                    "latency_measurement", False)
                         ):
                             self._delete_traffic_stream_config()
                             return False
