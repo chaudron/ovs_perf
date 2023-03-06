@@ -2633,7 +2633,7 @@ def create_single_graph(x, y, x_label, y_label, title,
     pps_plot.autoscale(enable=True, axis='both', tight=False)
     pps_plot.plot(x, y, 'o-', label='average')
     pps_plot.ticklabel_format(axis='y', style='plain')
-    pps_plot.grid(b=True, which='minor', color='k', linestyle=':', alpha=0.2)
+    pps_plot.grid(visible=True, which='minor', color='k', linestyle=':', alpha=0.2)
     pps_plot.minorticks_on()
 
     #
@@ -2740,8 +2740,8 @@ def create_single_graph(x, y, x_label, y_label, title,
         pmd_plot.set_xticklabels(x, ha='center')
         pmd_plot.set_ylabel("CPU utilization")
         pmd_plot.set_xlabel("Packet size")
-        pmd_plot.grid(b=True, which='major', axis='y')
-        pmd_plot.grid(b=True, which='minor', color='k', linestyle=':',
+        pmd_plot.grid(visible=True, which='major', axis='y')
+        pmd_plot.grid(visible=True, which='minor', color='k', linestyle=':',
                       alpha=0.2, axis='y')
         pmd_plot.minorticks_on()
         pmd_plot.legend(loc='center left', bbox_to_anchor=(1, 0.5))
@@ -2769,8 +2769,8 @@ def create_single_graph(x, y, x_label, y_label, title,
         ovs_plot.set_xticklabels(x, ha='center')
         ovs_plot.set_ylabel("CPU utilization")
         ovs_plot.set_xlabel("Packet size")
-        ovs_plot.grid(b=True, which='major', axis='y')
-        ovs_plot.grid(b=True, which='minor', color='k', linestyle=':',
+        ovs_plot.grid(visible=True, which='major', axis='y')
+        ovs_plot.grid(visible=True, which='minor', color='k', linestyle=':',
                       alpha=0.2, axis='y')
         ovs_plot.minorticks_on()
         ovs_plot.legend(loc='center left', bbox_to_anchor=(1, 0.5))
@@ -2801,8 +2801,8 @@ def create_single_graph(x, y, x_label, y_label, title,
         sys_plot.set_xticklabels(x, ha='center')
         sys_plot.set_ylabel("CPU utilization")
         sys_plot.set_xlabel("Packet Size")
-        sys_plot.grid(b=True, which='major', axis='y')
-        sys_plot.grid(b=True, which='minor', color='k', linestyle=':',
+        sys_plot.grid(visible=True, which='major', axis='y')
+        sys_plot.grid(visible=True, which='minor', color='k', linestyle=':',
                       alpha=0.2, axis='y')
         sys_plot.minorticks_on()
         sys_plot.legend(loc='center left', bbox_to_anchor=(1, 0.5))
@@ -2886,7 +2886,7 @@ def create_multiple_graph(x, y, x_label, y_label,
     pps_plot.grid(True)
     pps_plot.autoscale(enable=True, axis='both', tight=False)
     pps_plot.ticklabel_format(axis='y', style='plain')
-    pps_plot.grid(b=True, which='minor', color='k', linestyle=':', alpha=0.2)
+    pps_plot.grid(visible=True, which='minor', color='k', linestyle=':', alpha=0.2)
     pps_plot.minorticks_on()
 
     for y_run in natsorted(list(y.keys())):
@@ -2975,8 +2975,8 @@ def create_multiple_graph(x, y, x_label, y_label,
         cpu_plot.set_xticklabels(x, ha='center')
         cpu_plot.set_ylabel("CPU utilization")
         cpu_plot.set_xlabel(x_label)
-        cpu_plot.grid(b=True, which='major')
-        cpu_plot.grid(b=True, which='minor', color='k', linestyle=':',
+        cpu_plot.grid(visible=True, which='major')
+        cpu_plot.grid(visible=True, which='minor', color='k', linestyle=':',
                       alpha=0.2)
         cpu_plot.minorticks_on()
 
@@ -3052,8 +3052,8 @@ def create_multiple_graph(x, y, x_label, y_label,
         sys_plot.set_xticklabels(x, ha='center')
         sys_plot.set_ylabel("CPU utilization")
         sys_plot.set_xlabel(x_label)
-        sys_plot.grid(b=True, which='major')
-        sys_plot.grid(b=True, which='minor', color='k', linestyle=':',
+        sys_plot.grid(visible=True, which='major')
+        sys_plot.grid(visible=True, which='minor', color='k', linestyle=':',
                       alpha=0.2)
         sys_plot.minorticks_on()
 
