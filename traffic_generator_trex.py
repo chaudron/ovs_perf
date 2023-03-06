@@ -423,8 +423,8 @@ class TRex(TrafficGeneratorChassis):
     def _verify_port_action(self, port_name):
         if self.is_connected() and self._verify_port_string(port_name) and \
            port_name in self.port_data:
-            return(True)
-        return (False)
+            return True
+        return False
 
     def _verify_port_string(self, port_name):
         try:

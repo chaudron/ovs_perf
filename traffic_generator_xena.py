@@ -475,8 +475,8 @@ class XenaNetworks(TrafficGeneratorChassis):
     def _verify_port_action(self, port_name):
         if self.is_connected() and self._verify_port_string(port_name) and \
            port_name in self.port_data:
-            return(True)
-        return (False)
+            return True
+        return False
 
     def _verify_port_string(self, port_name):
         xport = port_name.split(',')
@@ -510,7 +510,7 @@ class XenaNetworks(TrafficGeneratorChassis):
         return self.is_connected()
 
     def disconnect(self):
-        del(self.__xena_manager)
+        del self.__xena_manager
         self.__xena_socket.disconnect()
         self.__xena_socket = None
         return False

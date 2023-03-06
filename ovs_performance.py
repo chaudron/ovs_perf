@@ -445,6 +445,12 @@ def test_p2v2p_single_packet_size(nr_of_flows, packet_size, **kwargs):
 
     ##################################################
     lprint("  * Stop packet receiver on VM...")
+
+    # Due to a change in OVS we need to get the vhost stats before we bring
+    # it down.
+    vp_tx_end, vp_tx_drop_end, vp_rx_end, vp_rx_drop_end \
+        = get_of_port_packet_stats(of_interfaces[config.virtual_interface])
+
     stop_traffic_loop_on_vm(config.dut_vm_address)
 
     ##################################################
@@ -459,8 +465,6 @@ def test_p2v2p_single_packet_size(nr_of_flows, packet_size, **kwargs):
 
     pp_tx_end, pp_tx_drop_end, pp_rx_end, pp_rx_drop_end \
         = get_of_port_packet_stats(of_interfaces[config.physical_interface])
-    vp_tx_end, vp_tx_drop_end, vp_rx_end, vp_rx_drop_end \
-        = get_of_port_packet_stats(of_interfaces[config.virtual_interface])
 
     pp_rx = pp_rx_end - pp_rx_start
     pp_tx = pp_tx_end - pp_tx_start
@@ -630,6 +634,12 @@ def test_p2v(nr_of_flows, packet_sizes):
 
         ##################################################
         lprint("  * Stop packet receiver on VM...")
+
+        # Due to a change in OVS we need to get the vhost stats before we
+        # bring it down.
+        vp_tx_end, vp_tx_drop_end = get_of_port_packet_stats(
+            of_interfaces[config.virtual_interface])[0:2]
+
         stop_traffic_rx_on_vm(config.dut_vm_address)
 
         ##################################################
@@ -642,8 +652,6 @@ def test_p2v(nr_of_flows, packet_sizes):
 
         pp_rx_end = get_of_port_packet_stats(
             of_interfaces[config.physical_interface])[2]
-        vp_tx_end, vp_tx_drop_end = get_of_port_packet_stats(
-            of_interfaces[config.virtual_interface])[0:2]
         pp_rx = pp_rx_end - pp_rx_start
         vp_tx = vp_tx_end - vp_tx_start
         vp_tx_drop = vp_tx_drop_end - vp_tx_drop_start
@@ -2633,7 +2641,8 @@ def create_single_graph(x, y, x_label, y_label, title,
     pps_plot.autoscale(enable=True, axis='both', tight=False)
     pps_plot.plot(x, y, 'o-', label='average')
     pps_plot.ticklabel_format(axis='y', style='plain')
-    pps_plot.grid(visible=True, which='minor', color='k', linestyle=':', alpha=0.2)
+    pps_plot.grid(visible=True, which='minor', color='k', linestyle=':',
+                  alpha=0.2)
     pps_plot.minorticks_on()
 
     #
@@ -2886,7 +2895,8 @@ def create_multiple_graph(x, y, x_label, y_label,
     pps_plot.grid(True)
     pps_plot.autoscale(enable=True, axis='both', tight=False)
     pps_plot.ticklabel_format(axis='y', style='plain')
-    pps_plot.grid(visible=True, which='minor', color='k', linestyle=':', alpha=0.2)
+    pps_plot.grid(visible=True, which='minor', color='k', linestyle=':',
+                  alpha=0.2)
     pps_plot.minorticks_on()
 
     for y_run in natsorted(list(y.keys())):

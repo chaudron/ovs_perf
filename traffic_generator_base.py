@@ -134,7 +134,7 @@ class TrafficGeneratorChassis(object):
         if port_name not in self.port_data:
             return False
 
-        del(self.port_data[port_name])
+        del self.port_data[port_name]
         self.port_data.pop(port_name, None)
         return True
 
